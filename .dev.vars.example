@@ -1,0 +1,6 @@
+# Скопируй в .dev.vars для локального запуска (wrangler dev). В git не попадёт.
+BOT_TOKEN=123456:ABC-your-token
+ALLOWED_IDS=123456789
+WEBHOOK_SECRET=any-random-string
+TURSO_URL=libsql://your-db.turso.io
+TURSO_AUTH_TOKEN=your-turso-jwt-token

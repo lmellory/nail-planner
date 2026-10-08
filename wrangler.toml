@@ -1,0 +1,27 @@
+name = "nail-planner"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Интерфейс Mini App (папка webapp/) раздаётся как статические файлы.
+# Запросы на /api/* и /webhook сначала попадают в Worker.
+[assets]
+directory = "./webapp"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/webhook"]
+
+# Cron каждую минуту: вечернее уведомление
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+TZ = "Europe/Chisinau"
+ENABLE_ID_COMMAND = "true"
+TURSO_URL = "libsql://nails-lmellory.aws-eu-west-1.turso.io"
+# После первого деплоя впиши сюда адрес своего Worker (с https:// и слэшем в конце):
+APP_URL = "https://nail-planner.mellory.workers.dev/"
+
+# Секреты (задаются через wrangler secret put):
+#   wrangler secret put BOT_TOKEN
+#   wrangler secret put ALLOWED_IDS
+#   wrangler secret put WEBHOOK_SECRET
+#   wrangler secret put TURSO_AUTH_TOKEN

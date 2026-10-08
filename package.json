@@ -1,0 +1,23 @@
+{
+  "name": "nail-planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply nail_planner --local",
+    "db:migrate:remote": "wrangler d1 migrations apply nail_planner --remote",
+    "db:export": "wrangler d1 export nail_planner --remote --output=backup.sql",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.0.0"
+  }
+}
