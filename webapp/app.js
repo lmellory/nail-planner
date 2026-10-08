@@ -7,12 +7,8 @@ if (tg) {
   tg.ready();
   tg.expand();
   try {
-    // Разворачиваем на полный экран (Telegram 8.0+)
-    tg.requestFullscreen?.();
-  } catch {}
-  try {
-    // Предотвращаем случайное закрытие приложения свайпом вниз при прокрутке расписания
-    tg.disableVerticalSwipes?.();
+    tg.setHeaderColor?.('#faf5f6');
+    tg.setBackgroundColor?.('#faf5f6');
   } catch {}
 }
 
@@ -74,6 +70,132 @@ const RU_WEEKDAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс
 const RU_WEEKDAYS_FULL = [
   'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'
 ];
+const RU_WEEKDAYS_LONG = [
+  'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье'
+];
+
+function pluralizeAppts(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return `${n} записей`;
+  if (mod10 === 1) return `${n} запись`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} записи`;
+  return `${n} записей`;
+}
+
+function updateGreeting() {
+  const dateEl = document.getElementById('greeting-date');
+  const titleEl = document.getElementById('greeting-title');
+  const timeEl = document.getElementById('greeting-time');
+  const cityEl = document.getElementById('greeting-city');
+  const avatarEl = document.getElementById('brand-avatar');
+
+  const now = new Date();
+  const dStr = fmt(now);
+
+  if (dateEl) {
+    const [y, m, dNum] = dStr.split('-').map(Number);
+    const wdIndex = (now.getDay() + 6) % 7;
+    const wdName = RU_WEEKDAYS_LONG[wdIndex].toUpperCase();
+    const mName = RU_MONTHS[m - 1].toUpperCase();
+    dateEl.textContent = `${wdName} · ${dNum} ${mName} ${y} Г.`;
+  }
+
+  const user = tg?.initDataUnsafe?.user;
+  let name = 'саша';
+  if (user?.first_name) {
+    name = user.first_name.toLowerCase();
+  }
+  const hour = now.getHours();
+  let greet = 'Добрый вечер';
+  if (hour >= 5 && hour < 12) greet = 'Доброе утро';
+  else if (hour >= 12 && hour < 18) greet = 'Добрый день';
+  else if (hour >= 18 && hour < 23) greet = 'Добрый вечер';
+  else greet = 'Доброй ночи';
+
+  if (titleEl) {
+    titleEl.textContent = `${greet}, ${name}.`;
+  }
+
+  if (timeEl) {
+    timeEl.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+  if (cityEl) {
+    cityEl.textContent = 'Кишинёв';
+  }
+
+  if (avatarEl && user?.photo_url) {
+    avatarEl.innerHTML = `<img src="${user.photo_url}" class="avatar-img" alt="avatar">`;
+  }
+}
+
+function updateStatusBanner() {
+  const statusIcon = document.getElementById('status-icon');
+  const mainText = document.getElementById('status-main-text');
+  const subText = document.getElementById('status-sub-text');
+  if (!mainText || !subText) return;
+
+  const count = state.appointments?.length || 0;
+  const isToday = state.selectedDate === todayStr;
+
+  if (!isToday) {
+    if (statusIcon) statusIcon.textContent = count ? '🌸' : '☕';
+    mainText.textContent = count ? pluralizeAppts(count) : 'Выходной день';
+    subText.textContent = count ? 'записей на этот день' : 'записей не запланировано';
+    return;
+  }
+
+  // Для сегодняшнего дня считаем время
+  if (count === 0) {
+    if (statusIcon) statusIcon.textContent = '☕';
+    mainText.textContent = 'Свободный день';
+    subText.textContent = 'записей на сегодня нет';
+    return;
+  }
+
+  const now = new Date();
+  const curMins = now.getHours() * 60 + now.getMinutes();
+
+  const sorted = [...state.appointments].sort((a, b) => a.start_time.localeCompare(b.start_time));
+  const first = sorted[0];
+  const [fH, fM] = first.start_time.split(':').map(Number);
+  const firstMins = fH * 60 + fM;
+
+  if (curMins < firstMins) {
+    const diff = firstMins - curMins;
+    const diffH = Math.floor(diff / 60);
+    const diffM = diff % 60;
+    if (statusIcon) statusIcon.textContent = '☕';
+    const timeStr = diffH > 0 ? `${diffH} ч ${diffM} мин` : `${diffM} мин`;
+    mainText.textContent = `Свободно ${timeStr}`;
+    subText.textContent = `до первой клиентки (${first.start_time})`;
+  } else {
+    const current = sorted.find((a) => {
+      const [sH, sM] = a.start_time.split(':').map(Number);
+      const [eH, eM] = a.end_time.split(':').map(Number);
+      return curMins >= sH * 60 + sM && curMins < eH * 60 + eM;
+    });
+    if (current) {
+      if (statusIcon) statusIcon.textContent = '💅';
+      mainText.textContent = `Приём: ${escapeHtml(current.client_name)}`;
+      subText.textContent = `до ${current.end_time}`;
+    } else {
+      const next = sorted.find((a) => {
+        const [sH, sM] = a.start_time.split(':').map(Number);
+        return sH * 60 + sM > curMins;
+      });
+      if (next) {
+        if (statusIcon) statusIcon.textContent = '☕';
+        mainText.textContent = `Свободное окно`;
+        subText.textContent = `следующая в ${next.start_time} (${escapeHtml(next.client_name)})`;
+      } else {
+        if (statusIcon) statusIcon.textContent = '✨';
+        mainText.textContent = 'Все записи завершены';
+        subText.textContent = 'отличный продуктивный день!';
+      }
+    }
+  }
+}
 
 function formatFullDateRu(dateStr) {
   const d = parseDate(dateStr);
@@ -136,37 +258,59 @@ function goScreen(name) {
   const target = document.getElementById(`screen-${name}`);
   if (target) target.classList.add('active');
 
-  const backBtn = document.getElementById('btn-back');
-  const headerActions = document.getElementById('header-actions');
+  const subHeader = document.getElementById('sub-header');
   const headerTitle = document.getElementById('header-title');
+  const bottomNav = document.getElementById('bottom-nav');
+  const fabBtn = document.getElementById('btn-add-appt');
+
+  // Переключение активного таба в нижней панели
+  document.querySelectorAll('.bottom-nav-item').forEach((el) => el.classList.remove('active'));
+  if (name === 'main') {
+    document.getElementById('tab-day')?.classList.add('active');
+  } else if (name === 'calendar') {
+    document.getElementById('tab-calendar')?.classList.add('active');
+  } else if (name === 'search') {
+    document.getElementById('tab-search')?.classList.add('active');
+  } else if (name === 'settings') {
+    document.getElementById('tab-settings')?.classList.add('active');
+  }
 
   if (name === 'main') {
-    if (backBtn) backBtn.style.display = 'none';
-    if (headerActions) headerActions.style.display = 'flex';
-    if (headerTitle) headerTitle.textContent = 'Ежедневник';
+    if (subHeader) subHeader.style.display = 'none';
+    if (bottomNav) bottomNav.style.display = 'flex';
+    if (fabBtn) fabBtn.style.display = 'flex';
     tg?.BackButton?.hide();
     tg?.MainButton?.hide();
   } else {
-    if (backBtn) backBtn.style.display = 'flex';
-    if (headerActions) headerActions.style.display = 'none';
+    if (subHeader) subHeader.style.display = 'flex';
     tg?.BackButton?.show();
 
     if (name === 'form') {
       if (headerTitle) headerTitle.textContent = state.editingAppointmentId ? 'Редактирование' : 'Новая запись';
+      if (bottomNav) bottomNav.style.display = 'none';
+      if (fabBtn) fabBtn.style.display = 'none';
       tg?.MainButton?.setText('Сохранить запись');
       tg?.MainButton?.show();
     } else if (name === 'calendar') {
       if (headerTitle) headerTitle.textContent = 'Календарь';
+      if (bottomNav) bottomNav.style.display = 'flex';
+      if (fabBtn) fabBtn.style.display = 'none';
       tg?.MainButton?.hide();
     } else if (name === 'search') {
-      if (headerTitle) headerTitle.textContent = 'Поиск';
+      if (headerTitle) headerTitle.textContent = 'Поиск клиента';
+      if (bottomNav) bottomNav.style.display = 'flex';
+      if (fabBtn) fabBtn.style.display = 'none';
       tg?.MainButton?.hide();
     } else if (name === 'note') {
       if (headerTitle) headerTitle.textContent = 'Заметка дня';
+      if (bottomNav) bottomNav.style.display = 'none';
+      if (fabBtn) fabBtn.style.display = 'none';
       tg?.MainButton?.setText('Сохранить заметку');
       tg?.MainButton?.show();
     } else if (name === 'settings') {
       if (headerTitle) headerTitle.textContent = 'Настройки';
+      if (bottomNav) bottomNav.style.display = 'flex';
+      if (fabBtn) fabBtn.style.display = 'none';
       tg?.MainButton?.hide();
     }
   }
@@ -305,15 +449,21 @@ if (stripContainer) {
 
 async function loadSelectedDay() {
   const heading = document.getElementById('selected-day-heading');
+  const weekdayEl = document.getElementById('selected-weekday-label');
   const sub = document.getElementById('selected-day-sub');
   const listEl = document.getElementById('appointments-list');
   const noteCard = document.getElementById('day-note-card');
   const noteContent = document.getElementById('day-note-content');
   const btnNoteText = document.getElementById('btn-day-note-text');
 
-  if (heading) {
-    heading.textContent = state.selectedDate === todayStr ? 'Сегодня' : formatFullDateRu(state.selectedDate);
-  }
+  const d = parseDate(state.selectedDate);
+  const wdIndex = (d.getDay() + 6) % 7;
+  const wdName = RU_WEEKDAYS_LONG[wdIndex].toUpperCase();
+  const dayNum = d.getDate();
+  const monthName = RU_MONTHS[d.getMonth()];
+
+  if (weekdayEl) weekdayEl.textContent = wdName;
+  if (heading) heading.textContent = `${dayNum} ${monthName}`;
   if (sub) {
     sub.textContent = state.selectedDate === todayStr ? formatFullDateRu(state.selectedDate) : '';
   }
@@ -338,7 +488,7 @@ async function loadSelectedDay() {
       if (btnNoteText) btnNoteText.textContent = 'Заметка';
     }
 
-    // Отображение списка записей
+    updateStatusBanner();
     renderAppointmentsList();
   } catch (err) {
     console.error('Ошибка загрузки дня:', err);
@@ -390,13 +540,19 @@ function renderAppointmentsList() {
       : '';
 
     card.innerHTML = `
-      <div class="appt-card-top">
-        <span class="appt-card-time">🕐 ${a.start_time}–${a.end_time}</span>
+      <div class="appt-time-col">
+        <span class="appt-time-start">${a.start_time}</span>
+        <span class="appt-time-end">${a.end_time}</span>
       </div>
-      <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
-      ${whoHtml}
-      <div class="appt-card-service">💅 <strong>${serviceRu}</strong>${coatingRu}</div>
-      ${commentHtml}
+      <div class="appt-divider">
+        <span class="appt-divider-dot"></span>
+      </div>
+      <div class="appt-info-col">
+        <div class="appt-client-name">${escapeHtml(a.client_name)}</div>
+        ${whoHtml}
+        <div class="appt-service-badge">💅 <strong>${serviceRu}</strong>${coatingRu}</div>
+        ${commentHtml}
+      </div>
     `;
 
     card.addEventListener('click', () => {
@@ -1056,7 +1212,24 @@ document.getElementById('btn-save-settings')?.addEventListener('click', saveSett
 document.getElementById('btn-export-csv')?.addEventListener('click', () => exportData('csv'));
 document.getElementById('btn-export-json')?.addEventListener('click', () => exportData('json'));
 
-// Навигационные кнопки в шапке
+// Навигационные кнопки в шапке и нижнем меню
+document.getElementById('tab-day')?.addEventListener('click', () => {
+  haptic('light');
+  goScreen('main');
+});
+document.getElementById('tab-calendar')?.addEventListener('click', () => {
+  haptic('light');
+  openCalendar();
+});
+document.getElementById('tab-search')?.addEventListener('click', () => {
+  haptic('light');
+  openSearch();
+});
+document.getElementById('tab-settings')?.addEventListener('click', () => {
+  haptic('light');
+  openSettings();
+});
+
 document.getElementById('btn-open-calendar')?.addEventListener('click', () => {
   haptic('light');
   openCalendar();
@@ -1083,6 +1256,8 @@ document.getElementById('btn-today')?.addEventListener('click', () => {
 // ===== 8. ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ =====
 
 async function init() {
+  updateGreeting();
+  setInterval(updateGreeting, 30000);
   goScreen('main');
   await loadWeekSummary();
   await loadSelectedDay();

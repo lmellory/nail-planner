@@ -4,108 +4,144 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>Ежедневник мастера</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <div id="app">
-    <!-- Верхняя панель навигации -->
-    <header class="app-header" id="app-header">
-      <div class="header-left">
-        <button type="button" class="icon-btn" id="btn-back" title="Назад" style="display: none;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"></polyline>
-          </svg>
-        </button>
-        <h1 class="header-title" id="header-title">Ежедневник</h1>
-      </div>
-      <div class="header-actions" id="header-actions">
-        <button type="button" class="icon-btn" id="btn-open-search" title="Поиск клиента">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn" id="btn-open-calendar" title="Календарь">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-          </svg>
-        </button>
-        <button type="button" class="icon-btn" id="btn-open-settings" title="Настройки">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-      </div>
+
+    <!-- Вспомогательная шапка для вспомогательных экранов (форма, календарь, поиск, настройки) -->
+    <header class="sub-header" id="sub-header" style="display: none;">
+      <button type="button" class="btn-sub-back" id="btn-back" title="Назад">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <span>Назад</span>
+      </button>
+      <h2 class="sub-header-title" id="header-title">Ежедневник</h2>
+      <div class="sub-header-spacer"></div>
     </header>
 
-    <!-- ЭКРАН 1: Основной (Неделя + список записей дня) -->
+    <!-- ===================================================================
+         ЭКРАН 1: Основной (стиль как на фото референса)
+         =================================================================== -->
     <main class="screen active" id="screen-main">
-      <!-- Навигация по неделе -->
-      <section class="week-navigation" id="week-navigation">
-        <div class="week-header-row">
-          <button type="button" class="btn-subtle" id="btn-prev-week" title="Предыдущая неделя">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-          </button>
-          <span class="week-period-label" id="week-period-label">Загрузка…</span>
-          <div class="week-header-buttons">
-            <button type="button" class="chip-today" id="btn-today">Сегодня</button>
-            <button type="button" class="btn-subtle" id="btn-next-week" title="Следующая неделя">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <div class="main-content-flow">
+        
+        <!-- 1. Верхняя полоса бренда и аватарки -->
+        <div class="brand-top-row">
+          <div class="brand-badge">
+            <span class="brand-badge-icon">📅</span>
+            <span class="brand-badge-text">ТИХИЙ ПЛАН</span>
+          </div>
+          <div class="brand-avatar" id="brand-avatar" title="Профиль">
+            <span class="avatar-fallback" id="avatar-fallback">💅</span>
+          </div>
+        </div>
+
+        <!-- 2. Блок приветствия (дата, Добрый вечер, время и город) -->
+        <section class="greeting-section">
+          <div class="greeting-date" id="greeting-date">ЧЕТВЕРГ · 8 ОКТЯБРЯ 2026 Г.</div>
+          <div class="greeting-main-row">
+            <h1 class="greeting-heading" id="greeting-title">Добрый вечер, саша.</h1>
+            <div class="greeting-meta-box">
+              <div class="meta-clock-row">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span id="greeting-time">22:20</span>
+              </div>
+              <div class="meta-city-label" id="greeting-city">Кишинёв</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Карточка «Эта неделя» (стиль карточки из референса) -->
+        <section class="week-card" id="week-navigation">
+          <div class="week-card-header">
+            <div class="week-title-wrap">
+              <h3 class="week-card-title">Эта неделя</h3>
+              <span class="week-card-period" id="week-period-label">5 окт. — 11 окт.</span>
+            </div>
+            <div class="week-arrows-wrap">
+              <button type="button" class="week-nav-arrow" id="btn-prev-week" title="Предыдущая неделя">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <button type="button" class="week-nav-arrow" id="btn-next-week" title="Следующая неделя">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 7 дней недели: Пн Вт Ср Чт Пт Сб Вс с активной ягодной пилюлей -->
+          <div class="week-strip-container" id="week-strip-container">
+            <div class="week-strip" id="week-strip">
+              <!-- Генерируется динамически через JS -->
+            </div>
+          </div>
+
+          <!-- Нижняя строка карточки недели -->
+          <div class="week-card-footer">
+            <span class="week-footer-badge" id="week-footer-badge">• Расписание активно</span>
+            <button type="button" class="btn-card-today" id="btn-today">Сегодня ↗</button>
+          </div>
+        </section>
+
+        <!-- 4. Секция выбранного дня -->
+        <section class="day-section" id="day-section">
+          <div class="day-headings-wrap">
+            <div class="day-weekday-tag" id="selected-weekday-label">ЧЕТВЕРГ</div>
+            <h2 class="day-calendar-heading" id="selected-day-heading">8 октября</h2>
+            <div class="selected-day-sub" id="selected-day-sub" style="display: none;"></div>
+          </div>
+
+          <!-- Мятно-зеленая статус-плашка (Свободно / Статус дня) -->
+          <div class="status-banner" id="status-banner">
+            <div class="status-icon-wrap" id="status-icon-wrap">
+              <span id="status-icon">☕</span>
+            </div>
+            <div class="status-texts">
+              <div class="status-main-line" id="status-main-text">Свободно 3 ч 10 мин</div>
+              <div class="status-sub-line" id="status-sub-text">до первой клиентки</div>
+            </div>
+            <button type="button" class="btn-status-note" id="btn-day-note-action">
+              <span>📝</span>
+              <span id="btn-day-note-text">Заметка</span>
             </button>
           </div>
-        </div>
 
-        <!-- 7 дней недели со свайпом -->
-        <div class="week-strip-container" id="week-strip-container">
-          <div class="week-strip" id="week-strip">
-            <!-- 7 дней генерируются через JS -->
+          <!-- Карточка заметки дня (если она заполнена) -->
+          <div class="day-note-card" id="day-note-card" style="display: none;">
+            <div class="day-note-header">
+              <span class="day-note-title">📝 Заметка на день</span>
+              <button type="button" class="btn-text-edit" id="btn-edit-note-card">Изменить</button>
+            </div>
+            <p class="day-note-content" id="day-note-content"></p>
           </div>
-        </div>
-      </section>
 
-      <!-- Выбранный день: заголовок, заметка и записи -->
-      <section class="day-section" id="day-section">
-        <div class="day-info-row">
-          <div>
-            <h2 class="selected-day-heading" id="selected-day-heading">Сегодня</h2>
-            <div class="selected-day-sub" id="selected-day-sub"></div>
+          <!-- Список записей клиентов выбранного дня -->
+          <div class="appointments-list" id="appointments-list">
+            <div class="loading-spinner">Загрузка записей…</div>
           </div>
-          <button type="button" class="btn-note-action" id="btn-day-note-action">
-            <span class="note-icon">📝</span>
-            <span id="btn-day-note-text">Заметка</span>
-          </button>
-        </div>
+        </section>
+      </div>
 
-        <!-- Баннер заметки дня, если она есть -->
-        <div class="day-note-card" id="day-note-card" style="display: none;">
-          <div class="day-note-header">
-            <span class="day-note-title">📝 Заметка на день</span>
-            <button type="button" class="btn-text-edit" id="btn-edit-note-card">Изменить</button>
-          </div>
-          <p class="day-note-content" id="day-note-content"></p>
-        </div>
-
-        <!-- Список записей выбранного дня -->
-        <div class="appointments-list" id="appointments-list">
-          <div class="loading-spinner">Загрузка записей…</div>
-        </div>
-      </section>
-
-      <!-- Фиксированная кнопка добавления записи («+») -->
+      <!-- Плавающая кнопка добавления записи («+») -->
       <button type="button" class="fab-btn" id="btn-add-appt" title="Добавить запись">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
       </button>
     </main>
 
-    <!-- ЭКРАН 2: Форма создания / редактирования записи -->
+    <!-- ===================================================================
+         ЭКРАН 2: Форма создания / редактирования записи
+         =================================================================== -->
     <section class="screen" id="screen-form">
       <div class="screen-content">
         <div class="form-title-bar">
@@ -213,23 +249,25 @@
       </div>
     </section>
 
-    <!-- ЭКРАН 3: Месячный календарь (от 1 января текущего года до +3 лет) -->
+    <!-- ===================================================================
+         ЭКРАН 3: Месячный календарь
+         =================================================================== -->
     <section class="screen" id="screen-calendar">
       <div class="screen-content">
         <div class="calendar-header-nav">
-          <button type="button" class="btn-subtle" id="btn-cal-prev-month">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          <button type="button" class="week-nav-arrow" id="btn-cal-prev-month">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
           <div class="calendar-title-wrap">
             <h2 class="calendar-title" id="cal-month-title">Октябрь 2026</h2>
           </div>
-          <button type="button" class="btn-subtle" id="btn-cal-next-month">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          <button type="button" class="week-nav-arrow" id="btn-cal-next-month">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </button>
         </div>
 
         <div class="calendar-quick-actions">
-          <button type="button" class="chip-today" id="btn-cal-goto-today">Перейти к сегодня</button>
+          <button type="button" class="btn-card-today" id="btn-cal-goto-today">Перейти к сегодня</button>
         </div>
 
         <!-- Дни недели календаря -->
@@ -244,7 +282,9 @@
       </div>
     </section>
 
-    <!-- ЭКРАН 4: Поиск клиента -->
+    <!-- ===================================================================
+         ЭКРАН 4: Поиск клиента
+         =================================================================== -->
     <section class="screen" id="screen-search">
       <div class="screen-content">
         <div class="search-box">
@@ -252,7 +292,7 @@
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="search" id="search-input" class="search-input" placeholder="Имя клиента (от 2 символов)…" autofocus>
+          <input type="search" id="search-input" class="search-input" placeholder="Имя клиента (от 2 символов)…">
           <button type="button" class="btn-clear" id="btn-search-clear" style="display: none;">✕</button>
         </div>
 
@@ -263,7 +303,9 @@
       </div>
     </section>
 
-    <!-- ЭКРАН 5: Заметка к дню -->
+    <!-- ===================================================================
+         ЭКРАН 5: Заметка к дню
+         =================================================================== -->
     <section class="screen" id="screen-note">
       <div class="screen-content">
         <div class="note-header-wrap">
@@ -285,7 +327,9 @@
       </div>
     </section>
 
-    <!-- ЭКРАН 6: Настройки и Экспорт -->
+    <!-- ===================================================================
+         ЭКРАН 6: Настройки и Экспорт
+         =================================================================== -->
     <section class="screen" id="screen-settings">
       <div class="screen-content">
         <h2>Настройки</h2>
@@ -337,6 +381,48 @@
         </div>
       </div>
     </section>
+
+    <!-- ===================================================================
+         НИЖНЯЯ ПАНЕЛЬ НАВИГАЦИИ (как на фото референса)
+         =================================================================== -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <button type="button" class="bottom-nav-item active" id="tab-day">
+        <svg class="nav-tab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span class="nav-tab-label">День</span>
+      </button>
+
+      <button type="button" class="bottom-nav-item" id="tab-calendar">
+        <svg class="nav-tab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5z"></path>
+          <circle cx="9" cy="9" r="1.5" fill="currentColor"></circle>
+          <circle cx="15" cy="9" r="1.5" fill="currentColor"></circle>
+          <circle cx="9" cy="15" r="1.5" fill="currentColor"></circle>
+          <circle cx="15" cy="15" r="1.5" fill="currentColor"></circle>
+        </svg>
+        <span class="nav-tab-label">Календарь</span>
+      </button>
+
+      <button type="button" class="bottom-nav-item" id="tab-search">
+        <svg class="nav-tab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span class="nav-tab-label">Клиенты</span>
+      </button>
+
+      <button type="button" class="bottom-nav-item" id="tab-settings">
+        <svg class="nav-tab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span class="nav-tab-label">Меню</span>
+      </button>
+    </nav>
 
     <!-- Всплывающий тост для уведомлений -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
