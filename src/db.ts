@@ -190,6 +190,26 @@ export async function getDaySummary(
   return [...map.values()];
 }
 
+/**
+ * Удаляет записи и заметки с датой СТРОГО раньше beforeDate (YYYY-MM-DD). Данные других пользователей не трогает.
+ * Возвращает, сколько записей и заметок удалено.
+ */
+export async function deleteDataBefore(
+  db: D1Database,
+  userId: number,
+  beforeDate: string,
+): Promise<{ appointments: number; notes: number }> {
+  const a = await db
+    .prepare('DELETE FROM appointments WHERE user_id=? AND date < ?')
+    .bind(userId, beforeDate)
+    .run();
+  const n = await db
+    .prepare('DELETE FROM day_notes WHERE user_id=? AND date < ?')
+    .bind(userId, beforeDate)
+    .run();
+  return { appointments: a.meta.changes ?? 0, notes: n.meta.changes ?? 0 };
+}
+
 export async function getAllAppointments(db: D1Database, userId: number): Promise<Appointment[]> {
   const r = await db
     .prepare('SELECT * FROM appointments WHERE user_id = ? ORDER BY date, start_time')

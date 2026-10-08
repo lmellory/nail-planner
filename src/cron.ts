@@ -6,14 +6,27 @@
 //    «бронируем» её атомарным UPDATE ещё до отправки, а при ошибке Telegram откатываем,
 //    поэтому на следующей минуте отправка будет повторена
 //  - если notify_time сам раньше 03:00, режим «доотправки после полуночи» отключается
+// Ночная очистка: в окне 03:00–03:04 по времени пользователя удаляются записи и заметки старше RETENTION_DAYS дней.
+//  Запрос идемпотентный, поэтому несколько срабатываний подряд в окне безопасны (и страхуют от пропущенной минуты).
 import type { Env } from './types';
-import { ensureUser, getDayNote, getUser, listAppointments } from './db';
+import { deleteDataBefore, ensureUser, getDayNote, getUser, listAppointments } from './db';
 import { parseAllowedIds } from './auth';
 import { addDays, nowInTz } from './lib/time';
 import { formatDay } from './lib/format';
 import { openAppKeyboard, sendMessage } from './bot/telegram';
 
 const CUTOFF = '03:00';
+
+/** Сколько дней хранить записи и заметки. Всё, что старше, удаляется ночью безвозвратно. */
+export const RETENTION_DAYS = 2;
+const CLEANUP_FROM = '03:00';
+const CLEANUP_TO = '03:05'; // не включительно
+
+/** Чистая функция: попадает ли текущее время в окно ночной очистки. */
+export const isCleanupTime = (nowTime: string): boolean => nowTime >= CLEANUP_FROM && nowTime < CLEANUP_TO;
+
+/** Чистая функция: записи с датой строго раньше возвращённой удаляются. */
+export const cleanupCutoff = (today: string): string => addDays(today, -RETENTION_DAYS);
 
 /** Чистая функция: пора ли слать уведомление и за какую «вечернюю дату». */
 export function notifyDecision(
@@ -33,9 +46,23 @@ export async function runNotifications(env: Env, appUrl: string) {
   for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
     try {
       const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
+      const now = nowInTz(u.tz);
+
+      // Ночная очистка старых данных (не зависит от того, включены ли уведомления; её сбой не мешает уведомлениям)
+      if (isCleanupTime(now.time)) {
+        try {
+          const cutoff = cleanupCutoff(now.date);
+          const del = await deleteDataBefore(env.DB, userId, cutoff);
+          if (del.appointments || del.notes) {
+            console.log(`cleanup user=${userId}: удалено записей=${del.appointments}, заметок=${del.notes} (даты до ${cutoff})`);
+          }
+        } catch (e) {
+          console.error('cleanup error', userId, e);
+        }
+      }
+
       if (!u.notify_enabled) continue;
 
-      const now = nowInTz(u.tz);
       const { send, eveningDate } = notifyDecision(now.date, now.time, u.notify_time, u.last_notified_date);
       if (!send) continue;
 
@@ -54,7 +81,9 @@ export async function runNotifications(env: Env, appUrl: string) {
 
       const text = `🌙 <b>Расписание на завтра</b>\n\n${formatDay(target, items, note)}`;
       const r = await sendMessage(env, userId, text, openAppKeyboard(appUrl));
-      if (!r.ok) {
+      if (r.ok) {
+        console.log(`notify sent user=${userId} evening=${eveningDate} target=${target} appointments=${items.length}`);
+      } else {
         // Не доставили — откатываем бронь, на следующей минуте попробуем снова
         await env.DB
           .prepare('UPDATE users SET last_notified_date=? WHERE user_id=?')
