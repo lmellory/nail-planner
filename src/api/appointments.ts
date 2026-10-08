@@ -1,8 +1,17 @@
 // CRUD записей + проверка пересечений (предупреждение, без запрета).
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
-import { findConflicts, getAppointment, listAppointments } from '../db';
+import {
+  deleteAppointment,
+  findConflicts,
+  getAppointment,
+  insertAppointment,
+  listAppointments,
+  updateAppointment,
+} from '../db';
 import { isDate, isTime } from '../lib/time';
+import { escapeHtml, sendMessage } from '../bot/telegram';
+import { serviceLabel } from '../lib/format';
 
 export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
@@ -26,10 +35,14 @@ function validate(b: any) {
     return [null, 'Укажи покрытие: с покрытием или без'] as const;
 
   return [{
-    date: b.date, start_time: b.start_time, end_time: b.end_time,
+    date: b.date as string,
+    start_time: b.start_time as string,
+    end_time: b.end_time as string,
     client_name: name.slice(0, 100),
     who: b.who ? String(b.who).slice(0, 200) : null,
-    service: b.service, manicure_coating: mc, pedicure_coating: pc,
+    service: b.service as 'manicure' | 'pedicure' | 'both',
+    manicure_coating: mc as 'gel' | 'none' | null,
+    pedicure_coating: pc as 'gel' | 'none' | null,
     comment: b.comment ? String(b.comment).slice(0, 1000) : null,
   }, null] as const;
 }
@@ -41,41 +54,39 @@ appointments.get('/', async (c) => {
   return c.json(await listAppointments(c.env.DB, c.get('userId'), from, to));
 });
 
-// POST /api/appointments/check — проверка пересечений до сохранения (для предупреждения в форме)
+// POST /api/appointments/check — проверка пересечений до сохранения (для предупреждения в форме).
+// Пока форма заполнена не до конца — просто отвечаем «пересечений нет», без ошибки.
 appointments.post('/check', async (c) => {
-  const b = await c.req.json();
-  const conflicts = await findConflicts(c.env.DB, c.get('userId'), b.date, b.start_time, b.end_time, Number(b.exclude_id ?? 0));
+  const b: any = await c.req.json().catch(() => null);
+  if (!isDate(b?.date) || !isTime(b?.start_time) || !isTime(b?.end_time)) return c.json({ conflicts: [] });
+  const conflicts = await findConflicts(
+    c.env.DB, c.get('userId'), b.date, b.start_time, b.end_time, Number(b.exclude_id) || 0,
+  );
   return c.json({ conflicts });
 });
 
 // POST /api/appointments — создать (пересечение не блокирует, возвращаем conflicts)
 appointments.post('/', async (c) => {
   const userId = c.get('userId');
-  const [d, err] = validate(await c.req.json());
+  const [d, err] = validate(await c.req.json().catch(() => null));
   if (!d) return c.json({ error: err }, 400);
-  const res = await c.env.DB.prepare(
-    `INSERT INTO appointments (user_id, date, start_time, end_time, client_name, who, service,
-       manicure_coating, pedicure_coating, comment) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-  ).bind(userId, d.date, d.start_time, d.end_time, d.client_name, d.who, d.service,
-         d.manicure_coating, d.pedicure_coating, d.comment).run();
-  const id = res.meta.last_row_id as number;
-  const conflicts = (await findConflicts(c.env.DB, userId, d.date, d.start_time, d.end_time, id));
 
-  // Уведомление мастера в Telegram о новой записи
+  const id = await insertAppointment(c.env.DB, userId, d);
+  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, d.end_time, id);
+
+  // Уведомление мастера в Telegram о новой записи (в фоне, не задерживает ответ; ошибки не ломают сохранение)
+  const [y, m, dNum] = d.date.split('-');
+  const text =
+    `💅 <b>Новая запись: ${dNum}.${m}.${y}</b>\n` +
+    `🕐 <b>${d.start_time}–${d.end_time}</b> · ${escapeHtml(d.client_name)}${d.who ? ` (${escapeHtml(d.who)})` : ''}\n` +
+    `💅 ${serviceLabel({ ...d, id, user_id: userId })}` +
+    (d.comment ? `\n💬 ${escapeHtml(d.comment)}` : '');
+  const notify = sendMessage(c.env, userId, text).catch((e) => console.error('new-appointment notify error', e));
   try {
-    const [y, m, dNum] = d.date.split('-');
-    const coat = (val: string | null) => (val === 'gel' ? 'с покрытием' : 'без покрытия');
-    let sLabel = `маникюр ${coat(d.manicure_coating)}`;
-    if (d.service === 'pedicure') sLabel = `педикюр ${coat(d.pedicure_coating)}`;
-    else if (d.service === 'both') sLabel = `маникюр ${coat(d.manicure_coating)} + педикюр ${coat(d.pedicure_coating)}`;
-
-    const text = `💅 <b>Новая запись: ${dNum}.${m}.${y}</b>\n🕐 <b>${d.start_time}–${d.end_time}</b> · ${d.client_name}${d.who ? ` (${d.who})` : ''}\n💅 ${sLabel}${d.comment ? `\n💬 ${d.comment}` : ''}`;
-    await c.env.DB && c.env.BOT_TOKEN && (await fetch(`https://api.telegram.org/bot${c.env.BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: userId, text, parse_mode: 'HTML' }),
-    }));
-  } catch {}
+    c.executionCtx.waitUntil(notify);
+  } catch {
+    await notify; // окружение без executionCtx (например, тесты)
+  }
 
   return c.json({ id, conflicts }, 201);
 });
@@ -84,22 +95,18 @@ appointments.post('/', async (c) => {
 appointments.put('/:id', async (c) => {
   const userId = c.get('userId');
   const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'bad id' }, 400);
   if (!(await getAppointment(c.env.DB, userId, id))) return c.json({ error: 'not found' }, 404);
-  const [d, err] = validate(await c.req.json());
+  const [d, err] = validate(await c.req.json().catch(() => null));
   if (!d) return c.json({ error: err }, 400);
-  await c.env.DB.prepare(
-    `UPDATE appointments SET date=?, start_time=?, end_time=?, client_name=?, who=?, service=?,
-       manicure_coating=?, pedicure_coating=?, comment=?, updated_at=datetime('now')
-     WHERE user_id=? AND id=?`,
-  ).bind(d.date, d.start_time, d.end_time, d.client_name, d.who, d.service,
-         d.manicure_coating, d.pedicure_coating, d.comment, userId, id).run();
+  await updateAppointment(c.env.DB, userId, id, d);
   const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, d.end_time, id);
   return c.json({ ok: true, conflicts });
 });
 
 // DELETE /api/appointments/:id
 appointments.delete('/:id', async (c) => {
-  const r = await c.env.DB.prepare('DELETE FROM appointments WHERE user_id=? AND id=?')
-    .bind(c.get('userId'), Number(c.req.param('id'))).run();
-  return c.json({ ok: r.meta.changes > 0 });
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'bad id' }, 400);
+  return c.json({ ok: await deleteAppointment(c.env.DB, c.get('userId'), id) });
 });

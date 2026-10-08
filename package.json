@@ -6,9 +6,6 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate:local": "wrangler d1 migrations apply nail_planner --local",
-    "db:migrate:remote": "wrangler d1 migrations apply nail_planner --remote",
-    "db:export": "wrangler d1 export nail_planner --remote --output=backup.sql",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

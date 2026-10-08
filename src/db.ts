@@ -3,9 +3,20 @@ import type { Appointment, UserRow } from './types';
 
 export type AppointmentInput = Omit<Appointment, 'id' | 'user_id'>;
 
+/** Время вечернего уведомления по умолчанию для новых пользователей. */
+export const DEFAULT_NOTIFY_TIME = '22:00';
+
+export async function getUser(db: D1Database, userId: number): Promise<UserRow | null> {
+  return db.prepare('SELECT * FROM users WHERE user_id = ?').bind(userId).first<UserRow>();
+}
+
 export async function ensureUser(db: D1Database, userId: number, tz: string): Promise<UserRow> {
-  await db.prepare('INSERT OR IGNORE INTO users (user_id, tz) VALUES (?, ?)').bind(userId, tz).run();
-  return (await db.prepare('SELECT * FROM users WHERE user_id = ?').bind(userId).first<UserRow>())!;
+  // notify_time задаём явно (а не через DEFAULT в схеме), чтобы значение по умолчанию жило в коде
+  await db
+    .prepare('INSERT OR IGNORE INTO users (user_id, tz, notify_time) VALUES (?, ?, ?)')
+    .bind(userId, tz, DEFAULT_NOTIFY_TIME)
+    .run();
+  return (await getUser(db, userId))!;
 }
 
 export async function listAppointments(db: D1Database, userId: number, from: string, to: string) {

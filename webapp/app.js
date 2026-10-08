@@ -6,6 +6,14 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
+  try {
+    // Разворачиваем на полный экран (Telegram 8.0+)
+    tg.requestFullscreen?.();
+  } catch {}
+  try {
+    // Предотвращаем случайное закрытие приложения свайпом вниз при прокрутке расписания
+    tg.disableVerticalSwipes?.();
+  } catch {}
 }
 
 /** Запрос к API. Подпись Telegram передаётся в заголовке X-Init-Data */
@@ -423,6 +431,7 @@ function openForm(appt = null) {
   const whoInput = document.getElementById('form-appt-who');
   const commentInput = document.getElementById('form-appt-comment');
   const deleteBtn = document.getElementById('btn-delete-appt');
+  const quickTomorrowBtn = document.getElementById('btn-quick-tomorrow');
   const conflictAlert = document.getElementById('conflict-alert');
 
   if (conflictAlert) conflictAlert.style.display = 'none';
@@ -440,6 +449,7 @@ function openForm(appt = null) {
     manicureCoating = appt.manicure_coating || 'gel';
     pedicureCoating = appt.pedicure_coating || 'gel';
     if (deleteBtn) deleteBtn.style.display = 'block';
+    if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'block';
   } else {
     if (formTitle) formTitle.textContent = 'Новая запись';
     if (apptId) apptId.value = '';
@@ -463,6 +473,7 @@ function openForm(appt = null) {
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
     if (deleteBtn) deleteBtn.style.display = 'none';
+    if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'none';
   }
 
   updateServiceAndCoatingUI();
@@ -662,6 +673,14 @@ async function deleteAppointment() {
 }
 
 document.getElementById('btn-save-appt')?.addEventListener('click', saveAppointment);
+document.getElementById('btn-quick-tomorrow')?.addEventListener('click', () => {
+  const dateInput = document.getElementById('form-appt-date');
+  if (!dateInput || !dateInput.value) return;
+  haptic('medium');
+  dateInput.value = addDays(dateInput.value, 1);
+  showToast('Дата сдвинута на +1 день ⏩');
+  checkConflicts();
+});
 document.getElementById('btn-delete-appt')?.addEventListener('click', deleteAppointment);
 document.getElementById('btn-cancel-appt')?.addEventListener('click', () => goScreen('main'));
 document.getElementById('btn-add-appt')?.addEventListener('click', () => {
@@ -982,7 +1001,7 @@ async function openSettings() {
     const tzSelect = document.getElementById('setting-tz');
 
     if (enabledCheck) enabledCheck.checked = !!s.notify_enabled;
-    if (timeInput) timeInput.value = s.notify_time || '23:00';
+    if (timeInput) timeInput.value = s.notify_time || '22:00';
     if (tzSelect && s.tz) {
       // Если такого часового пояса нет в списке, добавляем опцию
       if (![...tzSelect.options].some((o) => o.value === s.tz)) {
@@ -1001,7 +1020,7 @@ async function openSettings() {
 
 async function saveSettings() {
   const notify_enabled = !!document.getElementById('setting-notify-enabled')?.checked;
-  const notify_time = document.getElementById('setting-notify-time')?.value || '23:00';
+  const notify_time = document.getElementById('setting-notify-time')?.value || '22:00';
   const tz = document.getElementById('setting-tz')?.value || 'Europe/Chisinau';
 
   try {

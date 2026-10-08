@@ -9,7 +9,9 @@ export const exporter = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
 function csvEscape(val: unknown): string {
   if (val === null || val === undefined) return '';
-  const str = String(val);
+  let str = String(val);
+  // Защита от CSV-инъекции: Excel выполнит ячейку, начинающуюся с = + - @ как формулу
+  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
   if (/[;"\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -98,10 +100,8 @@ async function handleJson(c: Context<{ Bindings: Env; Variables: AppVars }>) {
   });
 }
 
-// Маршруты для прямого скачивания (поддерживаются как /api/export.csv, так и /api/export/csv)
-exporter.get('.csv', handleCsv);
+// Маршруты для прямого скачивания
 exporter.get('/csv', handleCsv);
-exporter.get('.json', handleJson);
 exporter.get('/json', handleJson);
 exporter.get('/', (c) => (c.req.query('format') === 'json' ? handleJson(c) : handleCsv(c)));
 

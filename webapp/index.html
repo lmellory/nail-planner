@@ -205,6 +205,7 @@
           <!-- Кнопки формы -->
           <div class="form-actions">
             <button type="button" class="btn-primary" id="btn-save-appt">Сохранить запись</button>
+            <button type="button" class="btn-secondary" id="btn-quick-tomorrow" style="display: none;">⏩ Перенести на завтра (+1 день)</button>
             <button type="button" class="btn-secondary" id="btn-cancel-appt">Отмена</button>
             <button type="button" class="btn-danger" id="btn-delete-appt" style="display: none;">Удалить запись</button>
           </div>
@@ -301,7 +302,7 @@
 
           <div class="form-group" id="group-notify-time">
             <label for="setting-notify-time">Время отправки (по вашему часовому поясу)</label>
-            <input type="time" id="setting-notify-time" class="form-input" value="23:00">
+            <input type="time" id="setting-notify-time" class="form-input" value="22:00">
           </div>
 
           <div class="form-group">
