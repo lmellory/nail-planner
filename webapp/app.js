@@ -90,6 +90,49 @@ function formatFullDateRu(dateStr) {
   return `${weekday}, ${d.getDate()} ${RU_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function updateGreeting() {
+  const dateEl = document.getElementById('greeting-date');
+  const titleEl = document.getElementById('greeting-title');
+  const avatarEl = document.getElementById('greeting-avatar');
+
+  const now = new Date();
+  const dStr = fmt(now);
+
+  if (dateEl) {
+    const [y, m, dNum] = dStr.split('-').map(Number);
+    const wdName = RU_WEEKDAYS_FULL[now.getDay()];
+    dateEl.textContent = `${wdName}, ${dNum} ${RU_MONTHS[m - 1]}`;
+  }
+
+  // Получаем имя мастера напрямую из Telegram WebApp SDK
+  const user = tg?.initDataUnsafe?.user;
+  const firstName = user?.first_name ? user.first_name.trim() : '';
+
+  const hour = now.getHours();
+  let greet = 'Добрый день';
+  if (hour >= 5 && hour < 12) greet = 'Доброе утро';
+  else if (hour >= 12 && hour < 18) greet = 'Добрый день';
+  else if (hour >= 18 && hour < 23) greet = 'Добрый вечер';
+  else greet = 'Доброй ночи';
+
+  if (titleEl) {
+    titleEl.textContent = firstName ? `${greet}, ${firstName} ✨` : `${greet} ✨`;
+  }
+
+  if (avatarEl) {
+    if (user?.photo_url) {
+      avatarEl.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = user.photo_url;
+      img.alt = firstName || 'Мастер';
+      img.className = 'avatar-img';
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.textContent = '💅';
+    }
+  }
+}
+
 // ===== Состояние приложения =====
 const todayStr = fmt(new Date());
 
@@ -150,6 +193,7 @@ function goScreen(name) {
   const headerTitle = document.getElementById('header-title');
 
   if (name === 'main') {
+    updateGreeting();
     if (backBtn) backBtn.style.display = 'none';
     if (headerActions) headerActions.style.display = 'flex';
     if (headerTitle) headerTitle.textContent = 'Ежедневник';
@@ -1105,6 +1149,7 @@ document.getElementById('btn-today')?.addEventListener('click', () => {
 // ===== 8. ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ =====
 
 async function init() {
+  updateGreeting();
   goScreen('main');
   await loadWeekSummary();
   await loadSelectedDay();
