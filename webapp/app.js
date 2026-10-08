@@ -6,72 +6,7 @@ const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
-  try {
-    // Устанавливаем фирменный пудровый цвет для системной плашки Telegram
-    tg.setHeaderColor?.('#fdf8f9');
-    tg.setBackgroundColor?.('#fdf8f9');
-  } catch {}
-  try {
-    // Разворачиваем на полный экран (Telegram 8.0+)
-    tg.requestFullscreen?.();
-  } catch {}
-  try {
-    // Предотвращаем случайное закрытие приложения свайпом вниз при прокрутке расписания
-    tg.disableVerticalSwipes?.();
-  } catch {}
-
-  // В некоторых мобильных клиентах Telegram запрос на полный экран срабатывает только при жесте пользователя
-  const triggerFsOnUserTouch = () => {
-    if (tg && !tg.isFullscreen) {
-      try { tg.requestFullscreen?.(); } catch {}
-    }
-  };
-  window.addEventListener('click', triggerFsOnUserTouch, { once: true });
-  window.addEventListener('touchstart', triggerFsOnUserTouch, { once: true, passive: true });
 }
-
-function toggleFullscreen() {
-  haptic('light');
-  if (tg && typeof tg.requestFullscreen === 'function') {
-    if (tg.isFullscreen) {
-      try { tg.exitFullscreen?.(); } catch {}
-      showToast('Обычный режим');
-    } else {
-      try { tg.requestFullscreen?.(); } catch {}
-      showToast('Во весь экран ⛶');
-    }
-    updateFullscreenIcon();
-    return;
-  }
-
-  // Fallback для стандартного браузера
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen?.().catch(() => {});
-    showToast('Во весь экран ⛶');
-  } else {
-    document.exitFullscreen?.().catch(() => {});
-    showToast('Обычный режим');
-  }
-  updateFullscreenIcon();
-}
-
-function updateFullscreenIcon() {
-  const isFs = Boolean(tg?.isFullscreen) || Boolean(document.fullscreenElement);
-  const enterIcon = document.getElementById('icon-fs-enter');
-  const exitIcon = document.getElementById('icon-fs-exit');
-  if (enterIcon && exitIcon) {
-    enterIcon.style.display = isFs ? 'none' : 'block';
-    exitIcon.style.display = isFs ? 'block' : 'none';
-  }
-}
-
-if (tg) {
-  tg.onEvent?.('fullscreenChanged', updateFullscreenIcon);
-  tg.onEvent?.('fullscreenFailed', () => {
-    try { tg.expand?.(); } catch {}
-  });
-}
-document.addEventListener('fullscreenchange', updateFullscreenIcon);
 
 /** Запрос к API. Подпись Telegram передаётся в заголовке X-Init-Data */
 async function api(path, options = {}) {
@@ -203,7 +138,6 @@ function goScreen(name) {
     if (headerTitle) headerTitle.textContent = 'Ежедневник';
     tg?.BackButton?.hide();
     tg?.MainButton?.hide();
-    try { tg?.disableClosingConfirmation?.(); } catch {}
   } else {
     if (backBtn) backBtn.style.display = 'flex';
     if (headerActions) headerActions.style.display = 'none';
@@ -213,24 +147,19 @@ function goScreen(name) {
       if (headerTitle) headerTitle.textContent = state.editingAppointmentId ? 'Редактирование' : 'Новая запись';
       tg?.MainButton?.setText('Сохранить запись');
       tg?.MainButton?.show();
-      try { tg?.enableClosingConfirmation?.(); } catch {}
     } else if (name === 'calendar') {
       if (headerTitle) headerTitle.textContent = 'Календарь';
       tg?.MainButton?.hide();
-      try { tg?.disableClosingConfirmation?.(); } catch {}
     } else if (name === 'search') {
       if (headerTitle) headerTitle.textContent = 'Поиск';
       tg?.MainButton?.hide();
-      try { tg?.disableClosingConfirmation?.(); } catch {}
     } else if (name === 'note') {
       if (headerTitle) headerTitle.textContent = 'Заметка дня';
       tg?.MainButton?.setText('Сохранить заметку');
       tg?.MainButton?.show();
-      try { tg?.enableClosingConfirmation?.(); } catch {}
     } else if (name === 'settings') {
       if (headerTitle) headerTitle.textContent = 'Настройки';
       tg?.MainButton?.hide();
-      try { tg?.disableClosingConfirmation?.(); } catch {}
     }
   }
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -378,7 +307,7 @@ async function loadSelectedDay() {
     heading.textContent = state.selectedDate === todayStr ? 'Сегодня' : formatFullDateRu(state.selectedDate);
   }
   if (sub) {
-    sub.textContent = state.selectedDate === todayStr ? formatFullDateRu(state.selectedDate) : 'Загрузка…';
+    sub.textContent = state.selectedDate === todayStr ? formatFullDateRu(state.selectedDate) : '';
   }
 
   // Загружаем записи и заметку дня
@@ -390,13 +319,6 @@ async function loadSelectedDay() {
 
     state.appointments = appts;
     state.currentDayNote = noteRes?.text || '';
-
-    if (sub) {
-      const fullDate = formatFullDateRu(state.selectedDate);
-      const count = state.appointments?.length || 0;
-      const countStr = count === 0 ? 'нет записей' : pluralizeAppts(count);
-      sub.textContent = state.selectedDate === todayStr ? `${fullDate} · ${countStr}` : countStr;
-    }
 
     // Отображение заметки
     if (state.currentDayNote.trim()) {
@@ -433,32 +355,13 @@ function renderAppointmentsList() {
     return;
   }
 
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
   listEl.innerHTML = '';
   for (const a of state.appointments) {
     const card = document.createElement('div');
     card.className = 'appointment-card';
     card.setAttribute('data-id', a.id);
 
-    // Подсветка текущей и прошедшей записи на сегодняшний день
-    let isCurrent = false;
-    if (state.selectedDate === todayStr && a.start_time && a.end_time) {
-      const [sH, sM] = a.start_time.split(':').map(Number);
-      const [eH, eM] = a.end_time.split(':').map(Number);
-      const startMin = sH * 60 + sM;
-      const endMin = eH * 60 + eM;
-      if (currentMinutes >= startMin && currentMinutes < endMin) {
-        isCurrent = true;
-        card.classList.add('is-current');
-      } else if (currentMinutes >= endMin) {
-        card.classList.add('is-past');
-      }
-    }
-
-    const whoFormatted = formatTextWithLinks(a.who);
-    const whoHtml = whoFormatted ? `<span class="appt-card-who">${whoFormatted}</span>` : '';
+    const whoHtml = a.who ? `<span class="appt-card-who">${escapeHtml(a.who)}</span>` : '';
 
     let serviceRu = 'Маникюр';
     if (a.service === 'pedicure') serviceRu = 'Педикюр';
@@ -474,19 +377,13 @@ function renderAppointmentsList() {
       coatingRu = ` (ман: ${coatTxt(a.manicure_coating)}, пед: ${coatTxt(a.pedicure_coating)})`;
     }
 
-    const commentFormatted = formatTextWithLinks(a.comment);
-    const commentHtml = commentFormatted
-      ? `<div class="appt-card-comment">💬 ${commentFormatted}</div>`
-      : '';
-
-    const currentBadge = isCurrent
-      ? '<span class="appt-status-badge current">🟢 Сейчас идёт</span>'
+    const commentHtml = a.comment
+      ? `<div class="appt-card-comment">💬 ${escapeHtml(a.comment)}</div>`
       : '';
 
     card.innerHTML = `
       <div class="appt-card-top">
         <span class="appt-card-time">🕐 ${a.start_time}–${a.end_time}</span>
-        ${currentBadge}
       </div>
       <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
       ${whoHtml}
@@ -508,21 +405,6 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function formatTextWithLinks(s) {
-  if (!s) return '';
-  const escaped = escapeHtml(s);
-  return escaped.replace(/@([a-zA-Z0-9_]{3,32})/g, '<a href="https://t.me/$1" target="_blank" rel="noopener" class="appt-client-link" onclick="event.stopPropagation()">@$1</a>');
-}
-
-function pluralizeAppts(n) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 19) return `${n} записей`;
-  if (mod10 === 1) return `${n} запись`;
-  if (mod10 >= 2 && mod10 <= 4) return `${n} записи`;
-  return `${n} записей`;
-}
-
 // ===== 3. ФОРМА ЗАПИСИ (СОЗДАНИЕ / РЕДАКТИРОВАНИЕ) =====
 
 let selectedService = 'manicure';
@@ -541,7 +423,6 @@ function openForm(appt = null) {
   const whoInput = document.getElementById('form-appt-who');
   const commentInput = document.getElementById('form-appt-comment');
   const deleteBtn = document.getElementById('btn-delete-appt');
-  const quickTomorrowBtn = document.getElementById('btn-quick-tomorrow');
   const conflictAlert = document.getElementById('conflict-alert');
 
   if (conflictAlert) conflictAlert.style.display = 'none';
@@ -559,7 +440,6 @@ function openForm(appt = null) {
     manicureCoating = appt.manicure_coating || 'gel';
     pedicureCoating = appt.pedicure_coating || 'gel';
     if (deleteBtn) deleteBtn.style.display = 'block';
-    if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'block';
   } else {
     if (formTitle) formTitle.textContent = 'Новая запись';
     if (apptId) apptId.value = '';
@@ -583,7 +463,6 @@ function openForm(appt = null) {
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
     if (deleteBtn) deleteBtn.style.display = 'none';
-    if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'none';
   }
 
   updateServiceAndCoatingUI();
@@ -783,14 +662,6 @@ async function deleteAppointment() {
 }
 
 document.getElementById('btn-save-appt')?.addEventListener('click', saveAppointment);
-document.getElementById('btn-quick-tomorrow')?.addEventListener('click', () => {
-  const dateInput = document.getElementById('form-appt-date');
-  if (!dateInput || !dateInput.value) return;
-  haptic('medium');
-  dateInput.value = addDays(dateInput.value, 1);
-  showToast('Дата сдвинута на +1 день ⏩');
-  checkConflicts();
-});
 document.getElementById('btn-delete-appt')?.addEventListener('click', deleteAppointment);
 document.getElementById('btn-cancel-appt')?.addEventListener('click', () => goScreen('main'));
 document.getElementById('btn-add-appt')?.addEventListener('click', () => {
@@ -1167,7 +1038,6 @@ document.getElementById('btn-export-csv')?.addEventListener('click', () => expor
 document.getElementById('btn-export-json')?.addEventListener('click', () => exportData('json'));
 
 // Навигационные кнопки в шапке
-document.getElementById('btn-toggle-fullscreen')?.addEventListener('click', toggleFullscreen);
 document.getElementById('btn-open-calendar')?.addEventListener('click', () => {
   haptic('light');
   openCalendar();
