@@ -65,6 +65,7 @@ export async function buildJsonBackup(db: D1Database, userId: number, fallbackTz
     notify_enabled: !!u.notify_enabled,
     notify_time: u.notify_time,
     tz: u.tz,
+    notify_new_appt: !!u.notify_new_appt,
   };
   return JSON.stringify({ appointments, day_notes, settings }, null, 2);
 }

@@ -9,9 +9,13 @@ directory = "./webapp"
 binding = "ASSETS"
 run_worker_first = ["/api/*", "/webhook"]
 
-# Cron каждую минуту: вечернее уведомление
+# Cron каждую минуту: вечернее уведомление и удаление старых сообщений бота
 [triggers]
 crons = ["* * * * *"]
+
+# Логи Worker (console.log/error, ошибки cron) доступны в панели Cloudflare и через `wrangler tail`
+[observability]
+enabled = true
 
 [vars]
 TZ = "Europe/Chisinau"

@@ -45,24 +45,8 @@
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Тёмная тема Telegram: адаптация контраста пудровой палитры */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-color: var(--tg-theme-bg-color, #1a1618);
-    --secondary-bg: var(--tg-theme-secondary-bg-color, #261f22);
-    --text-color: var(--tg-theme-text-color, #f5eff1);
-    --hint-color: var(--tg-theme-hint-color, #a8949a);
-    --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    --powder-50: #261e21;
-    --powder-100: #33272c;
-    --powder-dark: #f4b2c1;
-    --warning-bg: #332612;
-    --warning-border: #80601e;
-    --warning-text: #ffd580;
-  }
-}
-
-body.dark-theme {
+/* Тёмная тема: класс на <html> ставится до отрисовки (см. index.html) и при смене темы Telegram (app.js) */
+:root.dark-theme {
   --bg-color: var(--tg-theme-bg-color, #1a1618);
   --secondary-bg: var(--tg-theme-secondary-bg-color, #261f22);
   --text-color: var(--tg-theme-text-color, #f5eff1);
@@ -995,6 +979,14 @@ body {
 .toggle-label {
   font-size: 15px;
   font-weight: 600;
+}
+
+.setting-toggle-row > div {
+  padding-right: 12px;
+}
+
+.setting-toggle-row .toggle-checkbox {
+  flex-shrink: 0;
 }
 
 .toggle-checkbox {

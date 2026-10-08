@@ -2,11 +2,14 @@
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
 import {
+  NEW_APPT_MSG_TTL_SEC,
   deleteAppointment,
+  ensureUser,
   findConflicts,
   getAppointment,
   insertAppointment,
   listAppointments,
+  scheduleMessageDelete,
   updateAppointment,
 } from '../db';
 import { isDate, isTime } from '../lib/time';
@@ -74,14 +77,24 @@ appointments.post('/', async (c) => {
   const id = await insertAppointment(c.env.DB, userId, d);
   const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, d.end_time, id);
 
-  // Уведомление мастера в Telegram о новой записи (в фоне, не задерживает ответ; ошибки не ломают сохранение)
-  const [y, m, dNum] = d.date.split('-');
-  const text =
-    `💅 <b>Новая запись: ${dNum}.${m}.${y}</b>\n` +
-    `🕐 <b>${d.start_time}–${d.end_time}</b> · ${escapeHtml(d.client_name)}${d.who ? ` (${escapeHtml(d.who)})` : ''}\n` +
-    `💅 ${serviceLabel({ ...d, id, user_id: userId })}` +
-    (d.comment ? `\n💬 ${escapeHtml(d.comment)}` : '');
-  const notify = sendMessage(c.env, userId, text).catch((e) => console.error('new-appointment notify error', e));
+  // Уведомление мастера в Telegram о новой записи (только если включено в настройках).
+  // Отправляем в фоне: не задерживает ответ, ошибки не ломают сохранение.
+  // Сообщение бот сам удалит из чата через NEW_APPT_MSG_TTL_SEC (запись в базе остаётся).
+  const notify = (async () => {
+    const u = await ensureUser(c.env.DB, userId, c.env.TZ);
+    if (!u.notify_new_appt) return;
+    const [y, m, dNum] = d.date.split('-');
+    const text =
+      `💅 <b>Новая запись: ${dNum}.${m}.${y}</b>\n` +
+      `🕐 <b>${d.start_time}–${d.end_time}</b> · ${escapeHtml(d.client_name)}${d.who ? ` (${escapeHtml(d.who)})` : ''}\n` +
+      `💅 ${serviceLabel({ ...d, id, user_id: userId })}` +
+      (d.comment ? `\n💬 ${escapeHtml(d.comment)}` : '');
+    const r = await sendMessage(c.env, userId, text);
+    const messageId = r.result?.message_id;
+    if (r.ok && typeof messageId === 'number') {
+      await scheduleMessageDelete(c.env.DB, userId, messageId, NEW_APPT_MSG_TTL_SEC);
+    }
+  })().catch((e) => console.error('new-appointment notify error', e));
   try {
     c.executionCtx.waitUntil(notify);
   } catch {

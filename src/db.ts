@@ -6,6 +6,12 @@ export type AppointmentInput = Omit<Appointment, 'id' | 'user_id'>;
 /** Время вечернего уведомления по умолчанию для новых пользователей. */
 export const DEFAULT_NOTIFY_TIME = '22:00';
 
+/**
+ * Через сколько секунд бот удаляет из чата своё сообщение «Новая запись».
+ * Должно быть меньше 48 часов: позже Telegram не даёт удалить сообщение.
+ */
+export const NEW_APPT_MSG_TTL_SEC = 24 * 60 * 60;
+
 export async function getUser(db: D1Database, userId: number): Promise<UserRow | null> {
   return db.prepare('SELECT * FROM users WHERE user_id = ?').bind(userId).first<UserRow>();
 }
@@ -150,12 +156,12 @@ export async function searchAppointments(db: D1Database, userId: number, query: 
 export async function updateUserSettings(
   db: D1Database,
   userId: number,
-  settings: { notify_enabled: boolean | number; notify_time: string; tz: string },
+  settings: { notify_enabled: boolean | number; notify_time: string; tz: string; notify_new_appt: boolean | number },
 ): Promise<UserRow> {
-  const enabled = typeof settings.notify_enabled === 'boolean' ? (settings.notify_enabled ? 1 : 0) : settings.notify_enabled;
+  const flag = (v: boolean | number) => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
   await db
-    .prepare('UPDATE users SET notify_enabled=?, notify_time=?, tz=? WHERE user_id=?')
-    .bind(enabled, settings.notify_time, settings.tz, userId)
+    .prepare('UPDATE users SET notify_enabled=?, notify_time=?, tz=?, notify_new_appt=? WHERE user_id=?')
+    .bind(flag(settings.notify_enabled), settings.notify_time, settings.tz, flag(settings.notify_new_appt), userId)
     .run();
   return (await db.prepare('SELECT * FROM users WHERE user_id = ?').bind(userId).first<UserRow>())!;
 }
@@ -190,24 +196,41 @@ export async function getDaySummary(
   return [...map.values()];
 }
 
-/**
- * Удаляет записи и заметки с датой СТРОГО раньше beforeDate (YYYY-MM-DD). Данные других пользователей не трогает.
- * Возвращает, сколько записей и заметок удалено.
- */
-export async function deleteDataBefore(
+/** Запланировать удаление сообщения бота из чата через ttlSec секунд. */
+export async function scheduleMessageDelete(
   db: D1Database,
-  userId: number,
-  beforeDate: string,
-): Promise<{ appointments: number; notes: number }> {
-  const a = await db
-    .prepare('DELETE FROM appointments WHERE user_id=? AND date < ?')
-    .bind(userId, beforeDate)
+  chatId: number,
+  messageId: number,
+  ttlSec: number,
+  nowSec = Math.floor(Date.now() / 1000),
+): Promise<void> {
+  await db
+    .prepare('INSERT INTO scheduled_deletes (chat_id, message_id, delete_at) VALUES (?,?,?)')
+    .bind(chatId, messageId, nowSec + ttlSec)
     .run();
-  const n = await db
-    .prepare('DELETE FROM day_notes WHERE user_id=? AND date < ?')
-    .bind(userId, beforeDate)
-    .run();
-  return { appointments: a.meta.changes ?? 0, notes: n.meta.changes ?? 0 };
+}
+
+export interface ScheduledDelete {
+  id: number;
+  chat_id: number;
+  message_id: number;
+}
+
+/** Сообщения, которые пора удалить из чата. */
+export async function getDueMessageDeletes(
+  db: D1Database,
+  nowSec = Math.floor(Date.now() / 1000),
+  limit = 50,
+): Promise<ScheduledDelete[]> {
+  const r = await db
+    .prepare('SELECT id, chat_id, message_id FROM scheduled_deletes WHERE delete_at <= ? ORDER BY delete_at LIMIT ?')
+    .bind(nowSec, limit)
+    .all<ScheduledDelete>();
+  return r.results;
+}
+
+export async function removeScheduledDelete(db: D1Database, id: number): Promise<void> {
+  await db.prepare('DELETE FROM scheduled_deletes WHERE id=?').bind(id).run();
 }
 
 export async function getAllAppointments(db: D1Database, userId: number): Promise<Appointment[]> {

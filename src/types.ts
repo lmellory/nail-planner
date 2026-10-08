@@ -35,6 +35,7 @@ export interface UserRow {
   notify_enabled: number;
   notify_time: string;
   last_notified_date: string | null;
+  notify_new_appt: number;
 }
 
 // Переменные Hono-контекста (кладём туда проверенный user_id)

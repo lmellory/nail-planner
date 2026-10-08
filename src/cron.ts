@@ -1,32 +1,31 @@
-// Cron раз в минуту: вечернее уведомление «расписание на завтра».
-// Логика:
+// Cron раз в минуту: вечернее уведомление «расписание на завтра» + удаление старых сообщений бота.
+// Вечернее уведомление:
 //  - «вечерняя дата» = сегодня, а если сейчас до 03:00 — вчера (так досылаем пропущенное после полуночи)
 //  - отправляем, если время >= notify_time (или уже после полуночи, но до 03:00)
 //  - защита от дублей: users.last_notified_date хранит вечернюю дату последней отправки;
-//    «бронируем» её атомарным UPDATE ещё до отправки, а при ошибке Telegram откатываем,
-//    поэтому на следующей минуте отправка будет повторена
+//    «бронируем» её атомарным UPDATE ещё до отправки
+//  - если отправка не удалась (сетевая ошибка, исключение, ответ Telegram с ошибкой), бронь откатывается
+//    и на следующей минуте отправка повторяется
+//  - исключение: 403 (бот заблокирован / чат недоступен). Повторять бессмысленно, поэтому бронь остаётся,
+//    и до следующего вечера бот этому пользователю не пишет
 //  - если notify_time сам раньше 03:00, режим «доотправки после полуночи» отключается
-// Ночная очистка: в окне 03:00–03:04 по времени пользователя удаляются записи и заметки старше RETENTION_DAYS дней.
-//  Запрос идемпотентный, поэтому несколько срабатываний подряд в окне безопасны (и страхуют от пропущенной минуты).
+// Удаление сообщений: бот сам стирает из чата сообщения «Новая запись» (см. scheduled_deletes).
+// Записи и заметки в базе НЕ удаляются.
 import type { Env } from './types';
-import { deleteDataBefore, ensureUser, getDayNote, getUser, listAppointments } from './db';
+import {
+  ensureUser,
+  getDayNote,
+  getDueMessageDeletes,
+  getUser,
+  listAppointments,
+  removeScheduledDelete,
+} from './db';
 import { parseAllowedIds } from './auth';
 import { addDays, nowInTz } from './lib/time';
 import { formatDay } from './lib/format';
-import { openAppKeyboard, sendMessage } from './bot/telegram';
+import { deleteMessage, openAppKeyboard, sendMessage } from './bot/telegram';
 
 const CUTOFF = '03:00';
-
-/** Сколько дней хранить записи и заметки. Всё, что старше, удаляется ночью безвозвратно. */
-export const RETENTION_DAYS = 2;
-const CLEANUP_FROM = '03:00';
-const CLEANUP_TO = '03:05'; // не включительно
-
-/** Чистая функция: попадает ли текущее время в окно ночной очистки. */
-export const isCleanupTime = (nowTime: string): boolean => nowTime >= CLEANUP_FROM && nowTime < CLEANUP_TO;
-
-/** Чистая функция: записи с датой строго раньше возвращённой удаляются. */
-export const cleanupCutoff = (today: string): string => addDays(today, -RETENTION_DAYS);
 
 /** Чистая функция: пора ли слать уведомление и за какую «вечернюю дату». */
 export function notifyDecision(
@@ -42,28 +41,50 @@ export function notifyDecision(
   return { send: due && lastNotified !== eveningDate, eveningDate };
 }
 
+/** Чистая функция: что делать с результатом отправки. */
+export type SendOutcome = 'sent' | 'blocked' | 'retry';
+export function classifySend(r: { ok: boolean; error_code?: number } | null): SendOutcome {
+  if (r?.ok) return 'sent';
+  if (r?.error_code === 403) return 'blocked';
+  return 'retry';
+}
+
+/** Чистая функция: нужно ли забыть запланированное удаление после ответа Telegram. */
+export function shouldForgetDelete(r: { ok: boolean; error_code?: number }): boolean {
+  if (r.ok) return true;
+  const c = r.error_code;
+  // 4xx (кроме 429): сообщение уже удалено или слишком старое, повторять нет смысла
+  return typeof c === 'number' && c >= 400 && c < 500 && c !== 429;
+}
+
+/** Удаляет из чата сообщения, срок которых вышел. Сетевые ошибки и 429/5xx оставляют запись на следующую минуту. */
+export async function processScheduledDeletes(env: Env): Promise<void> {
+  const due = await getDueMessageDeletes(env.DB);
+  for (const d of due) {
+    try {
+      const r = await deleteMessage(env, d.chat_id, d.message_id);
+      if (shouldForgetDelete(r)) await removeScheduledDelete(env.DB, d.id);
+    } catch (e) {
+      console.error('scheduled delete error', d.id, e);
+    }
+  }
+}
+
 export async function runNotifications(env: Env, appUrl: string) {
+  try {
+    await processScheduledDeletes(env);
+  } catch (e) {
+    console.error('processScheduledDeletes error', e);
+  }
+
   for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
     try {
       const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
-      const now = nowInTz(u.tz);
-
-      // Ночная очистка старых данных (не зависит от того, включены ли уведомления; её сбой не мешает уведомлениям)
-      if (isCleanupTime(now.time)) {
-        try {
-          const cutoff = cleanupCutoff(now.date);
-          const del = await deleteDataBefore(env.DB, userId, cutoff);
-          if (del.appointments || del.notes) {
-            console.log(`cleanup user=${userId}: удалено записей=${del.appointments}, заметок=${del.notes} (даты до ${cutoff})`);
-          }
-        } catch (e) {
-          console.error('cleanup error', userId, e);
-        }
-      }
-
       if (!u.notify_enabled) continue;
 
-      const { send, eveningDate } = notifyDecision(now.date, now.time, u.notify_time, u.last_notified_date);
+      const now = nowInTz(u.tz);
+      const previousNotifiedDate = u.last_notified_date;
+      const { send, eveningDate } = notifyDecision(now.date, now.time, u.notify_time, previousNotifiedDate);
       if (!send) continue;
 
       // Атомарно «бронируем» отправку: если параллельный запуск cron уже успел — changes будет 0
@@ -76,19 +97,34 @@ export async function runNotifications(env: Env, appUrl: string) {
       if (!claim.meta.changes) continue;
 
       const target = addDays(eveningDate, 1); // «завтра» относительно вечера
-      const items = await listAppointments(env.DB, userId, target, target);
-      const note = await getDayNote(env.DB, userId, target);
+      let outcome: SendOutcome = 'retry';
+      let count = 0;
+      try {
+        const items = await listAppointments(env.DB, userId, target, target);
+        const note = await getDayNote(env.DB, userId, target);
+        count = items.length;
+        const text = `🌙 <b>Расписание на завтра</b>\n\n${formatDay(target, items, note)}`;
+        outcome = classifySend(await sendMessage(env, userId, text, openAppKeyboard(appUrl)));
+      } catch (e) {
+        console.error('notify send failed', userId, e);
+      }
 
-      const text = `🌙 <b>Расписание на завтра</b>\n\n${formatDay(target, items, note)}`;
-      const r = await sendMessage(env, userId, text, openAppKeyboard(appUrl));
-      if (r.ok) {
-        console.log(`notify sent user=${userId} evening=${eveningDate} target=${target} appointments=${items.length}`);
+      if (outcome === 'sent') {
+        console.log(`notify sent user=${userId} evening=${eveningDate} target=${target} appointments=${count}`);
+      } else if (outcome === 'blocked') {
+        // 403: повторять бессмысленно. Бронь остаётся, до следующего вечера не пытаемся.
+        console.warn(`notify blocked (403) user=${userId}: бот заблокирован или чат недоступен, повторов не будет`);
       } else {
-        // Не доставили — откатываем бронь, на следующей минуте попробуем снова
-        await env.DB
-          .prepare('UPDATE users SET last_notified_date=? WHERE user_id=?')
-          .bind(u.last_notified_date, userId)
-          .run();
+        // Не доставили: откатываем бронь, на следующей минуте попробуем снова.
+        // Условие по eveningDate не даёт затереть более свежую бронь.
+        try {
+          await env.DB
+            .prepare('UPDATE users SET last_notified_date=? WHERE user_id=? AND last_notified_date=?')
+            .bind(previousNotifiedDate, userId, eveningDate)
+            .run();
+        } catch (e) {
+          console.error('notify rollback failed', userId, e);
+        }
       }
     } catch (e) {
       console.error('notify error', userId, e);

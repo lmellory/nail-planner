@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>Ежедневник мастера</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    // Тёмная тема выставляется до отрисовки, чтобы не мигала светлая
+    try {
+      var t = window.Telegram && window.Telegram.WebApp;
+      if ((t && t.colorScheme === 'dark') || window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark-theme');
+      }
+    } catch (e) {}
+  </script>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -204,7 +213,6 @@
 
           <!-- Кнопки формы -->
           <div class="form-actions">
-            <button type="button" class="btn-primary" id="btn-save-appt">Сохранить запись</button>
             <button type="button" class="btn-secondary" id="btn-quick-tomorrow" style="display: none;">⏩ Перенести на завтра (+1 день)</button>
             <button type="button" class="btn-secondary" id="btn-cancel-appt">Отмена</button>
             <button type="button" class="btn-danger" id="btn-delete-appt" style="display: none;">Удалить запись</button>
@@ -278,7 +286,6 @@
         </div>
 
         <div class="form-actions">
-          <button type="button" class="btn-primary" id="btn-save-note">Сохранить заметку</button>
           <button type="button" class="btn-secondary" id="btn-cancel-note">Отмена</button>
           <button type="button" class="btn-danger" id="btn-delete-note">Очистить заметку</button>
         </div>
@@ -298,6 +305,14 @@
           <div class="setting-toggle-row">
             <label for="setting-notify-enabled" class="toggle-label">Включить уведомления</label>
             <input type="checkbox" id="setting-notify-enabled" class="toggle-checkbox">
+          </div>
+
+          <div class="setting-toggle-row">
+            <div>
+              <label for="setting-notify-new-appt" class="toggle-label">Сообщение о новой записи</label>
+              <small class="form-hint">Приходит при добавлении записи и само удаляется из чата через сутки. Сама запись остаётся в календаре.</small>
+            </div>
+            <input type="checkbox" id="setting-notify-new-appt" class="toggle-checkbox">
           </div>
 
           <div class="form-group" id="group-notify-time">

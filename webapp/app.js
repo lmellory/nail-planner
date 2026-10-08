@@ -13,11 +13,7 @@ if (tg) {
 
   const syncTgTheme = () => {
     const isDark = tg.colorScheme === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (isDark) {
-      document.body.classList.add('dark-theme');
-    } else {
-      document.body.classList.remove('dark-theme');
-    }
+    document.documentElement.classList.toggle('dark-theme', isDark);
     const bg = tg.themeParams?.bg_color || (isDark ? '#1a1618' : '#fdf8f9');
     try {
       tg.setHeaderColor?.(bg);
@@ -697,7 +693,6 @@ async function deleteAppointment() {
   });
 }
 
-document.getElementById('btn-save-appt')?.addEventListener('click', saveAppointment);
 document.getElementById('btn-quick-tomorrow')?.addEventListener('click', () => {
   const dateInput = document.getElementById('form-appt-date');
   if (!dateInput || !dateInput.value) return;
@@ -1012,7 +1007,6 @@ document.getElementById('btn-edit-note-card')?.addEventListener('click', () => {
   haptic('light');
   openNote();
 });
-document.getElementById('btn-save-note')?.addEventListener('click', saveDayNote);
 document.getElementById('btn-delete-note')?.addEventListener('click', deleteDayNote);
 document.getElementById('btn-cancel-note')?.addEventListener('click', () => goScreen('main'));
 
@@ -1022,10 +1016,12 @@ async function openSettings() {
   try {
     const s = await api('/settings');
     const enabledCheck = document.getElementById('setting-notify-enabled');
+    const newApptCheck = document.getElementById('setting-notify-new-appt');
     const timeInput = document.getElementById('setting-notify-time');
     const tzSelect = document.getElementById('setting-tz');
 
     if (enabledCheck) enabledCheck.checked = !!s.notify_enabled;
+    if (newApptCheck) newApptCheck.checked = s.notify_new_appt !== false;
     if (timeInput) timeInput.value = s.notify_time || '22:00';
     if (tzSelect && s.tz) {
       // Если такого часового пояса нет в списке, добавляем опцию
@@ -1045,13 +1041,14 @@ async function openSettings() {
 
 async function saveSettings() {
   const notify_enabled = !!document.getElementById('setting-notify-enabled')?.checked;
+  const notify_new_appt = !!document.getElementById('setting-notify-new-appt')?.checked;
   const notify_time = document.getElementById('setting-notify-time')?.value || '22:00';
   const tz = document.getElementById('setting-tz')?.value || 'Europe/Chisinau';
 
   try {
     await api('/settings', {
       method: 'PUT',
-      body: JSON.stringify({ notify_enabled, notify_time, tz }),
+      body: JSON.stringify({ notify_enabled, notify_time, tz, notify_new_appt }),
     });
     haptic('success');
     showToast('Настройки сохранены ✅');

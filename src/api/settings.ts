@@ -8,7 +8,12 @@ export const settings = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
 settings.get('/', async (c) => {
   const u = await ensureUser(c.env.DB, c.get('userId'), c.env.TZ);
-  return c.json({ notify_enabled: !!u.notify_enabled, notify_time: u.notify_time, tz: u.tz });
+  return c.json({
+    notify_enabled: !!u.notify_enabled,
+    notify_time: u.notify_time,
+    tz: u.tz,
+    notify_new_appt: !!u.notify_new_appt,
+  });
 });
 
 settings.put('/', async (c) => {
@@ -17,10 +22,15 @@ settings.put('/', async (c) => {
     return c.json({ error: 'Некорректное тело запроса' }, 400);
   }
 
-  const { notify_enabled, notify_time, tz } = body as Record<string, unknown>;
+  const { notify_enabled, notify_time, tz, notify_new_appt } = body as Record<string, unknown>;
 
   if (typeof notify_enabled !== 'boolean') {
     return c.json({ error: 'notify_enabled должен быть булевым значением' }, 400);
+  }
+
+  // Необязательное поле: старые клиенты его не шлют, тогда значение не меняется
+  if (notify_new_appt !== undefined && typeof notify_new_appt !== 'boolean') {
+    return c.json({ error: 'notify_new_appt должен быть булевым значением' }, 400);
   }
 
   if (!isTime(notify_time)) {
@@ -54,12 +64,18 @@ settings.put('/', async (c) => {
   }
 
   const userId = c.get('userId');
-  await ensureUser(c.env.DB, userId, c.env.TZ);
-  const updated = await updateUserSettings(c.env.DB, userId, { notify_enabled, notify_time, tz });
+  const current = await ensureUser(c.env.DB, userId, c.env.TZ);
+  const updated = await updateUserSettings(c.env.DB, userId, {
+    notify_enabled,
+    notify_time,
+    tz,
+    notify_new_appt: notify_new_appt === undefined ? current.notify_new_appt : notify_new_appt,
+  });
 
   return c.json({
     notify_enabled: !!updated.notify_enabled,
     notify_time: updated.notify_time,
     tz: updated.tz,
+    notify_new_appt: !!updated.notify_new_appt,
   });
 });
