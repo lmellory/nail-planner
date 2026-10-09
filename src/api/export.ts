@@ -43,7 +43,7 @@ export function buildCsv(items: Appointment[]): string {
       [
         a.date,
         a.start_time,
-        a.end_time,
+        a.end_time ?? '',
         a.client_name,
         a.who ?? '',
         serviceLabelRu(a.service),

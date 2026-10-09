@@ -149,29 +149,10 @@
             <input type="date" id="form-appt-date" class="form-input" required>
           </div>
 
-          <!-- Время начала, чипы длительности, время конца -->
+          <!-- Время приема -->
           <div class="form-group">
-            <label>Время приема *</label>
-            <div class="time-range-row">
-              <div class="time-field">
-                <span class="time-sublabel">Начало</span>
-                <input type="time" id="form-appt-start" class="form-input" required>
-              </div>
-              <span class="time-separator">–</span>
-              <div class="time-field">
-                <span class="time-sublabel">Конец</span>
-                <input type="time" id="form-appt-end" class="form-input" required>
-              </div>
-            </div>
-            <div class="duration-chips" id="duration-chips">
-              <span class="chips-label">Быстро:</span>
-              <button type="button" class="duration-chip" data-hours="1">1 ч</button>
-              <button type="button" class="duration-chip" data-hours="1.5">1.5 ч</button>
-              <button type="button" class="duration-chip" data-hours="2">2 ч</button>
-              <button type="button" class="duration-chip" data-hours="2.5">2.5 ч</button>
-              <button type="button" class="duration-chip" data-hours="3">3 ч</button>
-            </div>
-            <small class="form-hint">Конец времени строго позже начала</small>
+            <label for="form-appt-start">Время приема *</label>
+            <input type="time" id="form-appt-start" class="form-input time-single-input" required>
           </div>
 
           <!-- Имя клиента -->

@@ -648,62 +648,12 @@ body {
   margin-top: 4px;
 }
 
-/* Блок времени и быстрых чипов */
-.time-range-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.time-field {
-  flex: 1;
-}
-
-.time-sublabel {
-  display: block;
-  font-size: 11px;
-  color: var(--hint-color);
-  margin-bottom: 3px;
+/* Одиночное аккуратное поле времени приёма */
+.time-single-input {
+  font-size: 17px;
   font-weight: 600;
-  text-transform: uppercase;
-}
-
-.time-separator {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--hint-color);
-  margin-top: 18px;
-}
-
-.duration-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 8px;
-}
-
-.chips-label {
-  font-size: 12px;
-  color: var(--hint-color);
-}
-
-.duration-chip {
-  background: var(--powder-100);
-  border: 1px solid var(--accent-pink-border);
-  color: var(--powder-dark);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.duration-chip:active, .duration-chip.active {
-  background: var(--powder-400);
-  color: #fff;
-  border-color: var(--powder-500);
+  letter-spacing: 0.5px;
+  padding: 13px 16px;
 }
 
 /* Сегментированный переключатель услуг */

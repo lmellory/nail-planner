@@ -53,6 +53,11 @@ async function api(path, options = {}) {
 const pad = (n) => String(n).padStart(2, '0');
 const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
+function formatApptTime(a) {
+  if (!a) return '';
+  return a.end_time ? `${a.start_time}–${a.end_time}` : a.start_time;
+}
+
 function parseDate(s) {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
@@ -456,7 +461,7 @@ function renderAppointmentsList() {
 
     card.innerHTML = `
       <div class="appt-card-top">
-        <span class="appt-card-time">🕐 ${a.start_time}–${a.end_time}</span>
+        <span class="appt-card-time">🕐 ${formatApptTime(a)}</span>
       </div>
       <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
       ${whoHtml}
@@ -491,7 +496,6 @@ function openForm(appt = null) {
   const apptId = document.getElementById('form-appt-id');
   const dateInput = document.getElementById('form-appt-date');
   const startInput = document.getElementById('form-appt-start');
-  const endInput = document.getElementById('form-appt-end');
   const clientInput = document.getElementById('form-appt-client');
   const whoInput = document.getElementById('form-appt-who');
   const commentInput = document.getElementById('form-appt-comment');
@@ -506,7 +510,6 @@ function openForm(appt = null) {
     if (apptId) apptId.value = appt.id;
     if (dateInput) dateInput.value = appt.date;
     if (startInput) startInput.value = appt.start_time;
-    if (endInput) endInput.value = appt.end_time;
     if (clientInput) clientInput.value = appt.client_name;
     if (whoInput) whoInput.value = appt.who || '';
     if (commentInput) commentInput.value = appt.comment || '';
@@ -527,10 +530,8 @@ function openForm(appt = null) {
       defHour = Math.min(Math.max(now.getHours() + 1, 9), 20);
     }
     const defStart = `${pad(defHour)}:00`;
-    const defEnd = `${pad(defHour + 2)}:00`;
 
     if (startInput) startInput.value = defStart;
-    if (endInput) endInput.value = defEnd;
     if (clientInput) clientInput.value = '';
     if (whoInput) whoInput.value = '';
     if (commentInput) commentInput.value = '';
@@ -601,43 +602,18 @@ document.querySelectorAll('#pedicure-coating-selector .coating-chip').forEach((b
   });
 });
 
-// Чипы быстрого выбора длительности (1ч, 1.5ч, 2ч, 2.5ч, 3ч)
-document.querySelectorAll('#duration-chips .duration-chip').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    haptic('light');
-    const hours = parseFloat(btn.dataset.hours);
-    const startInput = document.getElementById('form-appt-start');
-    const endInput = document.getElementById('form-appt-end');
-    if (!startInput || !endInput || !startInput.value) return;
-
-    const [h, m] = startInput.value.split(':').map(Number);
-    const startMins = h * 60 + m;
-    const endMins = Math.min(startMins + Math.round(hours * 60), 23 * 60 + 59);
-
-    const endH = Math.floor(endMins / 60);
-    const endM = endMins % 60;
-    endInput.value = `${pad(endH)}:${pad(endM)}`;
-
-    document.querySelectorAll('#duration-chips .duration-chip').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-
-    checkConflicts();
-  });
-});
-
-// Проверка пересечений по времени перед сохранением
+// Проверка совпадений по времени перед сохранением
 let conflictCheckTimer = null;
 async function checkConflicts() {
   clearTimeout(conflictCheckTimer);
   conflictCheckTimer = setTimeout(async () => {
     const date = document.getElementById('form-appt-date')?.value;
     const start = document.getElementById('form-appt-start')?.value;
-    const end = document.getElementById('form-appt-end')?.value;
     const excludeId = state.editingAppointmentId || 0;
     const alertEl = document.getElementById('conflict-alert');
     const alertText = document.getElementById('conflict-alert-text');
 
-    if (!date || !start || !end || end <= start) {
+    if (!date || !start) {
       if (alertEl) alertEl.style.display = 'none';
       return;
     }
@@ -645,13 +621,13 @@ async function checkConflicts() {
     try {
       const res = await api('/appointments/check', {
         method: 'POST',
-        body: JSON.stringify({ date, start_time: start, end_time: end, exclude_id: excludeId }),
+        body: JSON.stringify({ date, start_time: start, exclude_id: excludeId }),
       });
 
       if (res.conflicts && res.conflicts.length > 0) {
         haptic('warning');
         const listStr = res.conflicts
-          .map((c) => `• <b>${c.start_time}–${c.end_time}</b>: ${escapeHtml(c.client_name)}`)
+          .map((c) => `• <b>${formatApptTime(c)}</b>: ${escapeHtml(c.client_name)}`)
           .join('<br>');
         if (alertText) alertText.innerHTML = listStr;
         if (alertEl) alertEl.style.display = 'flex';
@@ -664,26 +640,23 @@ async function checkConflicts() {
 
 document.getElementById('form-appt-date')?.addEventListener('change', checkConflicts);
 document.getElementById('form-appt-start')?.addEventListener('change', checkConflicts);
-document.getElementById('form-appt-end')?.addEventListener('change', checkConflicts);
 
 // Сохранение записи
 async function saveAppointment() {
   const date = document.getElementById('form-appt-date')?.value;
   const start_time = document.getElementById('form-appt-start')?.value;
-  const end_time = document.getElementById('form-appt-end')?.value;
   const client_name = document.getElementById('form-appt-client')?.value?.trim();
   const who = document.getElementById('form-appt-who')?.value?.trim() || null;
   const comment = document.getElementById('form-appt-comment')?.value?.trim() || null;
 
   if (!date) return showToast('Укажите дату');
-  if (!start_time || !end_time) return showToast('Укажите время начала и окончания');
-  if (end_time <= start_time) return showToast('Время конца должно быть строго позже начала');
+  if (!start_time) return showToast('Укажите время приема');
   if (!client_name) return showToast('Укажите имя клиента');
 
   const payload = {
     date,
     start_time,
-    end_time,
+    end_time: null,
     client_name,
     who,
     service: selectedService,
@@ -970,7 +943,7 @@ function renderSearchResults(items) {
 
     card.innerHTML = `
       <div class="appt-card-top">
-        <span class="appt-card-time">📅 ${formatFullDateRu(a.date)} · ${a.start_time}–${a.end_time}</span>
+        <span class="appt-card-time">📅 ${formatFullDateRu(a.date)} · ${formatApptTime(a)}</span>
       </div>
       <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
       ${whoHtml}

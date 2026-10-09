@@ -20,7 +20,7 @@ export interface Appointment {
   user_id: number;
   date: string;
   start_time: string;
-  end_time: string;
+  end_time: string | null; // у новых записей null, у старых может быть значение
   client_name: string;
   who: string | null;
   service: Service;

@@ -14,7 +14,7 @@ import {
 } from '../db';
 import { isDate, isTime } from '../lib/time';
 import { escapeHtml, sendMessage } from '../bot/telegram';
-import { serviceLabel } from '../lib/format';
+import { serviceLabel, timeLabel } from '../lib/format';
 
 export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
@@ -24,8 +24,9 @@ const COATINGS = ['gel', 'none'];
 /** Проверка и нормализация тела запроса. Возвращает [данные, ошибка]. */
 function validate(b: any) {
   if (!isDate(b?.date)) return [null, 'Некорректная дата'] as const;
-  if (!isTime(b?.start_time) || !isTime(b?.end_time)) return [null, 'Некорректное время'] as const;
-  if (b.end_time <= b.start_time) return [null, 'Конец должен быть позже начала'] as const;
+  if (!isTime(b?.start_time)) return [null, 'Некорректное время'] as const;
+  const endTime = isTime(b?.end_time) ? (b.end_time as string) : null;
+  if (endTime && endTime <= b.start_time) return [null, 'Конец должен быть позже начала'] as const;
   const name = String(b.client_name ?? '').trim();
   if (!name) return [null, 'Укажи имя клиента'] as const;
   if (!SERVICES.includes(b.service)) return [null, 'Некорректная услуга'] as const;
@@ -40,7 +41,7 @@ function validate(b: any) {
   return [{
     date: b.date as string,
     start_time: b.start_time as string,
-    end_time: b.end_time as string,
+    end_time: endTime,
     client_name: name.slice(0, 100),
     who: b.who ? String(b.who).slice(0, 200) : null,
     service: b.service as 'manicure' | 'pedicure' | 'both',
@@ -61,9 +62,9 @@ appointments.get('/', async (c) => {
 // Пока форма заполнена не до конца — просто отвечаем «пересечений нет», без ошибки.
 appointments.post('/check', async (c) => {
   const b: any = await c.req.json().catch(() => null);
-  if (!isDate(b?.date) || !isTime(b?.start_time) || !isTime(b?.end_time)) return c.json({ conflicts: [] });
+  if (!isDate(b?.date) || !isTime(b?.start_time)) return c.json({ conflicts: [] });
   const conflicts = await findConflicts(
-    c.env.DB, c.get('userId'), b.date, b.start_time, b.end_time, Number(b.exclude_id) || 0,
+    c.env.DB, c.get('userId'), b.date, b.start_time, Number(b.exclude_id) || 0,
   );
   return c.json({ conflicts });
 });
@@ -75,7 +76,7 @@ appointments.post('/', async (c) => {
   if (!d) return c.json({ error: err }, 400);
 
   const id = await insertAppointment(c.env.DB, userId, d);
-  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, d.end_time, id);
+  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, id);
 
   // Уведомление мастера в Telegram о новой записи (только если включено в настройках).
   // Отправляем в фоне: не задерживает ответ, ошибки не ломают сохранение.
@@ -86,7 +87,7 @@ appointments.post('/', async (c) => {
     const [y, m, dNum] = d.date.split('-');
     const text =
       `💅 <b>Новая запись: ${dNum}.${m}.${y}</b>\n` +
-      `🕐 <b>${d.start_time}–${d.end_time}</b> · ${escapeHtml(d.client_name)}${d.who ? ` (${escapeHtml(d.who)})` : ''}\n` +
+      `🕐 <b>${timeLabel(d)}</b> · ${escapeHtml(d.client_name)}${d.who ? ` (${escapeHtml(d.who)})` : ''}\n` +
       `💅 ${serviceLabel({ ...d, id, user_id: userId })}` +
       (d.comment ? `\n💬 ${escapeHtml(d.comment)}` : '');
     const r = await sendMessage(c.env, userId, text);
@@ -113,7 +114,7 @@ appointments.put('/:id', async (c) => {
   const [d, err] = validate(await c.req.json().catch(() => null));
   if (!d) return c.json({ error: err }, 400);
   await updateAppointment(c.env.DB, userId, id, d);
-  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, d.end_time, id);
+  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, id);
   return c.json({ ok: true, conflicts });
 });
 

@@ -36,16 +36,22 @@ export async function getAppointment(db: D1Database, userId: number, id: number)
   return db.prepare('SELECT * FROM appointments WHERE user_id = ? AND id = ?').bind(userId, id).first<Appointment>();
 }
 
-/** Записи дня, пересекающиеся с интервалом [start, end). excludeId — при редактировании. */
+/** Записи дня, совпадающие по времени начала (или пересекающиеся со старыми интервалами). excludeId — при редактировании. */
 export async function findConflicts(
-  db: D1Database, userId: number, date: string, start: string, end: string, excludeId = 0,
+  db: D1Database,
+  userId: number,
+  date: string,
+  start: string,
+  excludeId = 0,
 ) {
   const r = await db
     .prepare(
       `SELECT * FROM appointments
-       WHERE user_id = ? AND date = ? AND id != ? AND start_time < ? AND end_time > ?`,
+       WHERE user_id = ? AND date = ? AND id != ?
+         AND (start_time = ? OR (end_time IS NOT NULL AND start_time <= ? AND end_time > ?))`,
     )
-    .bind(userId, date, excludeId, end, start).all<Appointment>();
+    .bind(userId, date, excludeId, start, start, start)
+    .all<Appointment>();
   return r.results;
 }
 
@@ -63,7 +69,7 @@ export async function insertAppointment(
       userId,
       data.date,
       data.start_time,
-      data.end_time,
+      data.end_time ?? null,
       data.client_name,
       data.who,
       data.service,
@@ -90,7 +96,7 @@ export async function updateAppointment(
     .bind(
       data.date,
       data.start_time,
-      data.end_time,
+      data.end_time ?? null,
       data.client_name,
       data.who,
       data.service,
