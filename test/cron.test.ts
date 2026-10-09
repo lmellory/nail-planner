@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  birthdayDecision,
   classifySend,
+  formatBirthdayNotification,
   notifyDecision,
   processScheduledDeletes,
   runNotifications,
@@ -272,5 +274,57 @@ describe('processScheduledDeletes: удаление сообщений бота 
     await processScheduledDeletes(envWith(makeDb({ user: baseUser(), deletes })));
 
     expect(deletes).toHaveLength(1);
+  });
+});
+
+describe('birthdayDecision', () => {
+  it('до 10:00 утра не отправляет', () => {
+    expect(birthdayDecision('2026-10-09', '09:59', null)).toBe(false);
+  });
+
+  it('ровно в 10:00 отправляет, если сегодня ещё не отправляли', () => {
+    expect(birthdayDecision('2026-10-09', '10:00', null)).toBe(true);
+    expect(birthdayDecision('2026-10-09', '10:00', '2026-10-08')).toBe(true);
+  });
+
+  it('не отправляет повторно в тот же день', () => {
+    expect(birthdayDecision('2026-10-09', '10:30', '2026-10-09')).toBe(false);
+  });
+
+  it('отправляет на следующий день в 10:00', () => {
+    expect(birthdayDecision('2026-10-10', '10:00', '2026-10-09')).toBe(true);
+  });
+});
+
+describe('formatBirthdayNotification', () => {
+  it('форматирует поздравление для одной клиентки с контактами', () => {
+    const clients = [
+      {
+        name: 'Светлана',
+        phone: '+373 69 123456',
+        telegram: '@sveta',
+        notes: 'Аллергия на липкий слой',
+      },
+    ];
+    const text = formatBirthdayNotification(clients);
+    expect(text).toContain('У клиентки <b>Светлана</b> сегодня день рождения!');
+    expect(text).toContain('📞 +373 69 123456');
+    expect(text).toContain('https://t.me/sveta');
+    expect(text).toContain('Аллергия на липкий слой');
+  });
+
+  it('форматирует поздравление для нескольких именинниц', () => {
+    const clients = [
+      { name: 'Анна', phone: '+79991234567' },
+      { name: 'Елена', telegram: 'elena' },
+    ];
+    const text = formatBirthdayNotification(clients);
+    expect(text).toContain('Сегодня день рождения у ваших клиентов:');
+    expect(text).toContain('<b>Анна</b>');
+    expect(text).toContain('<b>Елена</b>');
+  });
+
+  it('возвращает пустую строку для пустого списка', () => {
+    expect(formatBirthdayNotification([])).toBe('');
   });
 });

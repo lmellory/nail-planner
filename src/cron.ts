@@ -15,6 +15,7 @@ import type { Env } from './types';
 import {
   ensureUser,
   getClientByName,
+  getClientsWithBirthday,
   getDayNote,
   getDueMessageDeletes,
   getUser,
@@ -24,7 +25,7 @@ import {
 import { parseAllowedIds } from './auth';
 import { addDays, nowInTz } from './lib/time';
 import { formatDay } from './lib/format';
-import { deleteMessage, openAppKeyboard, sendMessage } from './bot/telegram';
+import { deleteMessage, escapeHtml, openAppKeyboard, sendMessage } from './bot/telegram';
 
 const CUTOFF = '03:00';
 
@@ -136,6 +137,105 @@ export async function runNotifications(env: Env, appUrl: string) {
       }
     } catch (e) {
       console.error('notify error', userId, e);
+    }
+  }
+
+  try {
+    await runBirthdayNotifications(env, appUrl);
+  } catch (e) {
+    console.error('runBirthdayNotifications error', e);
+  }
+}
+
+export const BIRTHDAY_NOTIFY_TIME = '10:00';
+
+/** Чистая функция: пора ли слать утреннее уведомление о дне рождения в 10:00. */
+export function birthdayDecision(
+  nowDate: string,
+  nowTime: string,
+  lastBirthdayNotified: string | null,
+  targetTime = BIRTHDAY_NOTIFY_TIME,
+): boolean {
+  return nowTime >= targetTime && lastBirthdayNotified !== nowDate;
+}
+
+/** Форматирование поздравления о дне рождения клиента. */
+export function formatBirthdayNotification(
+  clients: Array<{ name: string; phone?: string | null; telegram?: string | null; notes?: string | null }>,
+): string {
+  if (!clients.length) return '';
+  if (clients.length === 1) {
+    const c = clients[0];
+    let msg = `🎂 <b>Сегодня день рождения!</b>\n\n🎉 У клиентки <b>${escapeHtml(c.name)}</b> сегодня день рождения! 💐`;
+    if (c.phone) msg += `\n📞 ${escapeHtml(c.phone)}`;
+    if (c.telegram) {
+      const tg = c.telegram.replace(/^@/, '');
+      msg += `\n💬 <a href="https://t.me/${escapeHtml(tg)}">@${escapeHtml(tg)}</a>`;
+    }
+    if (c.notes) msg += `\n📝 <i>${escapeHtml(c.notes)}</i>`;
+    msg += `\n\nНе забудьте поздравить любимого клиента! 🥳`;
+    return msg;
+  }
+
+  let msg = `🎂 <b>Сегодня день рождения!</b>\n\n🎉 Сегодня день рождения у ваших клиентов:`;
+  for (const c of clients) {
+    msg += `\n\n• <b>${escapeHtml(c.name)}</b> 💐`;
+    if (c.phone) msg += `\n  📞 ${escapeHtml(c.phone)}`;
+    if (c.telegram) {
+      const tg = c.telegram.replace(/^@/, '');
+      msg += `\n  💬 <a href="https://t.me/${escapeHtml(tg)}">@${escapeHtml(tg)}</a>`;
+    }
+    if (c.notes) msg += `\n  📝 <i>${escapeHtml(c.notes)}</i>`;
+  }
+  msg += `\n\nНе забудьте поздравить! 🥳`;
+  return msg;
+}
+
+export async function runBirthdayNotifications(env: Env, appUrl: string) {
+  for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
+    try {
+      const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
+      const now = nowInTz(u.tz || env.TZ);
+      const previousBdayDate = u.last_birthday_notify_date ?? null;
+
+      if (!birthdayDecision(now.date, now.time, previousBdayDate)) continue;
+
+      // Атомарно бронируем отправку за сегодняшнюю дату
+      const claim = await env.DB
+        .prepare(
+          'UPDATE users SET last_birthday_notify_date=? WHERE user_id=? AND (last_birthday_notify_date IS NULL OR last_birthday_notify_date != ?)',
+        )
+        .bind(now.date, userId, now.date)
+        .run();
+      if (!claim.meta.changes) continue;
+
+      const [y, m, d] = now.date.split('-');
+      const todayDDMM = `${d}.${m}`;
+
+      const bdayClients = await getClientsWithBirthday(env.DB, userId, todayDDMM);
+      if (!bdayClients.length) {
+        // Именинников сегодня нет — бронь остаётся, чтобы больше не проверять сегодня
+        continue;
+      }
+
+      const text = formatBirthdayNotification(bdayClients);
+      const outcome = classifySend(await sendMessage(env, userId, text, openAppKeyboard(appUrl)));
+
+      if (outcome === 'sent') {
+        console.log(`birthday notify sent user=${userId} count=${bdayClients.length}`);
+      } else if (outcome === 'retry') {
+        // Откатываем бронь при сбое сети, чтобы повторить через минуту
+        try {
+          await env.DB
+            .prepare('UPDATE users SET last_birthday_notify_date=? WHERE user_id=? AND last_birthday_notify_date=?')
+            .bind(previousBdayDate, userId, now.date)
+            .run();
+        } catch (e) {
+          console.error('birthday rollback failed', userId, e);
+        }
+      }
+    } catch (e) {
+      console.error('birthday notify error', userId, e);
     }
   }
 }

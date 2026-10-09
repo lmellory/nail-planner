@@ -2,7 +2,7 @@
 import type { Appointment, Client, UserRow } from './types';
 
 export type AppointmentInput = Omit<Appointment, 'id' | 'user_id'>;
-export type ClientInput = { name: string; phone?: string | null; telegram?: string | null; notes?: string | null };
+export type ClientInput = { name: string; phone?: string | null; telegram?: string | null; notes?: string | null; birthday?: string | null };
 
 /** Время вечернего уведомления по умолчанию для новых пользователей. */
 export const DEFAULT_NOTIFY_TIME = '22:00';
@@ -257,15 +257,16 @@ export async function getClientAppointments(db: D1Database, userId: number, clie
 export async function insertClient(db: D1Database, userId: number, data: ClientInput): Promise<number> {
   const res = await db
     .prepare(
-      `INSERT INTO clients (user_id, name, phone, telegram, notes)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO clients (user_id, name, phone, telegram, notes, birthday)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(user_id, name) DO UPDATE SET
          phone = COALESCE(excluded.phone, clients.phone),
          telegram = COALESCE(excluded.telegram, clients.telegram),
          notes = COALESCE(excluded.notes, clients.notes),
+         birthday = COALESCE(excluded.birthday, clients.birthday),
          updated_at = datetime('now')`,
     )
-    .bind(userId, data.name.trim(), data.phone || null, data.telegram || null, data.notes || null)
+    .bind(userId, data.name.trim(), data.phone || null, data.telegram || null, data.notes || null, data.birthday || null)
     .run();
   return (res.meta.last_row_id as number) || 0;
 }
@@ -273,10 +274,10 @@ export async function insertClient(db: D1Database, userId: number, data: ClientI
 export async function updateClient(db: D1Database, userId: number, id: number, data: ClientInput): Promise<boolean> {
   const res = await db
     .prepare(
-      `UPDATE clients SET name = ?, phone = ?, telegram = ?, notes = ?, updated_at = datetime('now')
+      `UPDATE clients SET name = ?, phone = ?, telegram = ?, notes = ?, birthday = ?, updated_at = datetime('now')
        WHERE user_id = ? AND id = ?`,
     )
-    .bind(data.name.trim(), data.phone || null, data.telegram || null, data.notes || null, userId, id)
+    .bind(data.name.trim(), data.phone || null, data.telegram || null, data.notes || null, data.birthday || null, userId, id)
     .run();
   return (res.meta.changes ?? 0) > 0;
 }
@@ -284,6 +285,14 @@ export async function updateClient(db: D1Database, userId: number, id: number, d
 export async function deleteClient(db: D1Database, userId: number, id: number): Promise<boolean> {
   const res = await db.prepare('DELETE FROM clients WHERE user_id = ? AND id = ?').bind(userId, id).run();
   return (res.meta.changes ?? 0) > 0;
+}
+
+export async function getClientsWithBirthday(db: D1Database, userId: number, birthdayDDMM: string): Promise<Client[]> {
+  const r = await db
+    .prepare('SELECT * FROM clients WHERE user_id = ? AND birthday = ? ORDER BY name COLLATE NOCASE ASC')
+    .bind(userId, birthdayDDMM)
+    .all<Client>();
+  return r.results;
 }
 
 /** Автоматически создаем клиента, если его еще нет */

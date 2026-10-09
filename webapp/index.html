@@ -433,6 +433,10 @@
         </div>
         <div class="modal-body" id="modal-client-body">
           <div class="client-meta-card">
+            <div class="client-contact-row" id="client-view-bday-row" style="display: none;">
+              <span class="contact-icon">🎂</span>
+              <span id="client-view-bday-text" class="client-view-bday-badge"></span>
+            </div>
             <div class="client-contact-row" id="client-view-phone-row" style="display: none;">
               <span class="contact-icon">📞</span>
               <a href="#" id="client-view-phone-link" class="contact-link"></a>
@@ -472,6 +476,31 @@
           <div class="form-group">
             <label for="edit-client-name">Имя *</label>
             <input type="text" id="edit-client-name" class="form-input" placeholder="Например: Мария" required>
+          </div>
+          <div class="form-group">
+            <label>🎂 День рождения (число и месяц)</label>
+            <div class="birthday-selects-row">
+              <select id="edit-client-bday-day" class="form-select bday-select">
+                <option value="">День</option>
+              </select>
+              <select id="edit-client-bday-month" class="form-select bday-select">
+                <option value="">Месяц</option>
+                <option value="01">Январь</option>
+                <option value="02">Февраль</option>
+                <option value="03">Март</option>
+                <option value="04">Апрель</option>
+                <option value="05">Май</option>
+                <option value="06">Июнь</option>
+                <option value="07">Июль</option>
+                <option value="08">Август</option>
+                <option value="09">Сентябрь</option>
+                <option value="10">Октябрь</option>
+                <option value="11">Ноябрь</option>
+                <option value="12">Декабрь</option>
+              </select>
+              <button type="button" class="btn-clear-bday" id="btn-clear-bday" title="Очистить">&times;</button>
+            </div>
+            <span class="field-hint">Бот пришлёт напоминание в 10:00 в день рождения</span>
           </div>
           <div class="form-group">
             <label for="edit-client-phone">Телефон</label>

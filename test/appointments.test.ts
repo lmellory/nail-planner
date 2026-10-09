@@ -106,3 +106,30 @@ describe('validate appointment input', () => {
     expect(err2).toBe('Укажи покрытие: с покрытием или без');
   });
 });
+
+import { cleanBirthday } from '../src/api/clients';
+
+describe('cleanBirthday', () => {
+  it('нормализует корректные даты DD.MM', () => {
+    expect(cleanBirthday('15.03')).toBe('15.03');
+    expect(cleanBirthday('9.10')).toBe('09.10');
+    expect(cleanBirthday('09-10')).toBe('09.10');
+    expect(cleanBirthday(' 01.01 ')).toBe('01.01');
+  });
+
+  it('возвращает null для пустых значений', () => {
+    expect(cleanBirthday(null)).toBeNull();
+    expect(cleanBirthday(undefined)).toBeNull();
+    expect(cleanBirthday('')).toBeNull();
+    expect(cleanBirthday('   ')).toBeNull();
+  });
+
+  it('отклоняет некорректные дни и месяцы', () => {
+    expect(cleanBirthday('32.05')).toBeNull();
+    expect(cleanBirthday('00.05')).toBeNull();
+    expect(cleanBirthday('15.13')).toBeNull();
+    expect(cleanBirthday('не_дата')).toBeNull();
+    expect(cleanBirthday('15.03.1995')).toBeNull(); // год не допускается
+  });
+});
+

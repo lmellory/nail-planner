@@ -1336,6 +1336,47 @@ async function loadClients(search = '') {
   }
 }
 
+const MONTH_NAMES_RU = [
+  '', 'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+];
+
+function formatBirthdayRu(ddmm) {
+  if (!ddmm) return '';
+  const [d, m] = ddmm.split('.');
+  const day = Number(d);
+  const month = Number(m);
+  if (!day || !month || !MONTH_NAMES_RU[month]) return ddmm;
+  return `${day} ${MONTH_NAMES_RU[month]}`;
+}
+
+function isBirthdayToday(ddmm) {
+  if (!ddmm) return false;
+  const now = new Date();
+  const d = String(now.getDate()).padStart(2, '0');
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  return ddmm === `${d}.${m}`;
+}
+
+function initBirthdaySelectors() {
+  const daySelect = document.getElementById('edit-client-bday-day');
+  if (!daySelect || daySelect.options.length > 1) return;
+  for (let i = 1; i <= 31; i++) {
+    const opt = document.createElement('option');
+    const val = String(i).padStart(2, '0');
+    opt.value = val;
+    opt.textContent = i;
+    daySelect.appendChild(opt);
+  }
+}
+
+document.getElementById('btn-clear-bday')?.addEventListener('click', () => {
+  const d = document.getElementById('edit-client-bday-day');
+  const m = document.getElementById('edit-client-bday-month');
+  if (d) d.value = '';
+  if (m) m.value = '';
+});
+
 function renderClientsList(items) {
   const listEl = document.getElementById('clients-list');
   if (!listEl) return;
@@ -1361,11 +1402,20 @@ function renderClientsList(items) {
     if (c.telegram) contacts.push(`💬 @${escapeHtml(c.telegram.replace(/^@/, ''))}`);
     if (c.last_visit) contacts.push(`Посл. визит: ${c.last_visit}`);
 
+    let bdayHtml = '';
+    if (c.birthday) {
+      if (isBirthdayToday(c.birthday)) {
+        bdayHtml = `<span class="client-card-bday today">🎉 Сегодня ДР!</span>`;
+      } else {
+        bdayHtml = `<span class="client-card-bday">🎂 ${formatBirthdayRu(c.birthday)}</span>`;
+      }
+    }
+
     const noteHtml = c.notes ? `<div class="client-card-note">💡 ${escapeHtml(c.notes)}</div>` : '';
 
     card.innerHTML = `
       <div class="client-card-top">
-        <span class="client-card-name">${escapeHtml(c.name)}</span>
+        <span class="client-card-name">${escapeHtml(c.name)} ${bdayHtml}</span>
         <span class="client-card-visits">${c.appointments_count || 0} виз.</span>
       </div>
       <div class="client-card-contacts">${contacts.join(' · ') || 'Контакты не указаны'}</div>
@@ -1385,6 +1435,8 @@ async function openClientView(id) {
   currentViewingClientId = id;
   const modal = document.getElementById('modal-client-view');
   const nameEl = document.getElementById('modal-client-name');
+  const bdayRow = document.getElementById('client-view-bday-row');
+  const bdayText = document.getElementById('client-view-bday-text');
   const phoneRow = document.getElementById('client-view-phone-row');
   const phoneLink = document.getElementById('client-view-phone-link');
   const tgRow = document.getElementById('client-view-tg-row');
@@ -1400,6 +1452,19 @@ async function openClientView(id) {
     const history = data.history || [];
 
     if (nameEl) nameEl.textContent = client.name;
+
+    if (client.birthday && bdayRow && bdayText) {
+      bdayRow.style.display = 'flex';
+      if (isBirthdayToday(client.birthday)) {
+        bdayText.className = 'client-view-bday-badge today';
+        bdayText.textContent = `🎉 Сегодня день рождения! (${formatBirthdayRu(client.birthday)})`;
+      } else {
+        bdayText.className = 'client-view-bday-badge';
+        bdayText.textContent = `День рождения: ${formatBirthdayRu(client.birthday)}`;
+      }
+    } else if (bdayRow) {
+      bdayRow.style.display = 'none';
+    }
 
     if (client.phone && phoneRow && phoneLink) {
       phoneRow.style.display = 'flex';
@@ -1457,10 +1522,14 @@ function closeClientView() {
 
 function openClientEdit(client = null) {
   closeClientView();
+  initBirthdaySelectors();
+
   const modal = document.getElementById('modal-client-edit');
   const title = document.getElementById('modal-client-edit-title');
   const idInput = document.getElementById('edit-client-id');
   const nameInput = document.getElementById('edit-client-name');
+  const bdayDay = document.getElementById('edit-client-bday-day');
+  const bdayMonth = document.getElementById('edit-client-bday-month');
   const phoneInput = document.getElementById('edit-client-phone');
   const tgInput = document.getElementById('edit-client-tg');
   const notesInput = document.getElementById('edit-client-notes');
@@ -1472,6 +1541,15 @@ function openClientEdit(client = null) {
     if (phoneInput) phoneInput.value = client.phone || '';
     if (tgInput) tgInput.value = client.telegram || '';
     if (notesInput) notesInput.value = client.notes || '';
+
+    if (client.birthday) {
+      const [d, m] = client.birthday.split('.');
+      if (bdayDay) bdayDay.value = d || '';
+      if (bdayMonth) bdayMonth.value = m || '';
+    } else {
+      if (bdayDay) bdayDay.value = '';
+      if (bdayMonth) bdayMonth.value = '';
+    }
   } else {
     if (title) title.textContent = 'Новый клиент';
     if (idInput) idInput.value = '';
@@ -1479,6 +1557,8 @@ function openClientEdit(client = null) {
     if (phoneInput) phoneInput.value = '';
     if (tgInput) tgInput.value = '';
     if (notesInput) notesInput.value = '';
+    if (bdayDay) bdayDay.value = '';
+    if (bdayMonth) bdayMonth.value = '';
   }
 
   if (modal) modal.style.display = 'flex';
@@ -1497,19 +1577,28 @@ async function saveClientModal() {
   const telegram = document.getElementById('edit-client-tg')?.value?.trim() || null;
   const notes = document.getElementById('edit-client-notes')?.value?.trim() || null;
 
+  const bdayDay = document.getElementById('edit-client-bday-day')?.value;
+  const bdayMonth = document.getElementById('edit-client-bday-month')?.value;
+  let birthday = null;
+  if (bdayDay && bdayMonth) {
+    birthday = `${bdayDay}.${bdayMonth}`;
+  } else if (bdayDay || bdayMonth) {
+    return showToast('Укажите и день, и месяц рождения');
+  }
+
   if (!name) return showToast('Укажите имя клиента');
 
   try {
     if (id) {
       await api(`/clients/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, phone, telegram, notes }),
+        body: JSON.stringify({ name, phone, telegram, notes, birthday }),
       });
       showToast('Клиент обновлён ✅');
     } else {
       await api('/clients', {
         method: 'POST',
-        body: JSON.stringify({ name, phone, telegram, notes }),
+        body: JSON.stringify({ name, phone, telegram, notes, birthday }),
       });
       showToast('Клиент добавлен ✅');
     }

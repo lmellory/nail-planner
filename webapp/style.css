@@ -1520,3 +1520,95 @@ body {
   line-height: 1.4;
 }
 
+/* --------------------------------------------------------------------------
+   День рождения клиента
+   -------------------------------------------------------------------------- */
+.birthday-selects-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bday-select {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-pink-border);
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn-clear-bday {
+  width: 36px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-pink-border);
+  background: var(--powder-100);
+  color: var(--hint-color);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-clear-bday:hover {
+  background: var(--powder-200);
+  color: var(--powder-700);
+}
+
+.field-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--hint-color);
+  margin-top: 4px;
+}
+
+.client-view-bday-badge {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--powder-700);
+  background: var(--powder-100);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--powder-300);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.client-view-bday-badge.today {
+  background: #fdf2f8;
+  color: #db2777;
+  border-color: #f472b6;
+  font-weight: 700;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.client-card-bday {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--powder-700);
+  background: var(--powder-100);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--powder-200);
+  margin-left: 6px;
+}
+
+.client-card-bday.today {
+  background: #fdf2f8;
+  color: #db2777;
+  border-color: #f472b6;
+  font-weight: 700;
+}
+
+

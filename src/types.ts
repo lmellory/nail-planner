@@ -39,6 +39,7 @@ export interface UserRow {
   work_start_time?: string; // '09:00'
   work_end_time?: string;   // '20:00'
   work_days?: string;       // '1,2,3,4,5,6' (1=Пн, 7=Вс)
+  last_birthday_notify_date?: string | null;
 }
 
 export interface Client {
@@ -48,6 +49,7 @@ export interface Client {
   phone: string | null;
   telegram: string | null;
   notes: string | null;
+  birthday?: string | null; // 'DD.MM' (например '15.03')
   created_at: string;
   updated_at: string;
   appointments_count?: number;
