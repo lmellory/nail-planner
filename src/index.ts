@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { AppVars, Env } from './types';
 import { authMiddleware } from './auth';
 import { appointments } from './api/appointments';
+import { clients } from './api/clients';
 import { notes } from './api/notes';
 import { days } from './api/days';
 import { search } from './api/search';
@@ -25,9 +26,18 @@ app.use('*', async (c, next) => {
 // Бот (webhook Telegram)
 app.route('/webhook', webhook as any);
 
+// Проверка наличия базы для API роутов
+app.use('/api/*', async (c, next) => {
+  if (!c.env.DB) {
+    return c.json({ error: 'Database connection is not configured' }, 500);
+  }
+  await next();
+});
+
 // API Mini App — только с валидной подписью Telegram и ID из ALLOWED_IDS
 app.use('/api/*', authMiddleware);
 app.route('/api/appointments', appointments);
+app.route('/api/clients', clients);
 app.route('/api/notes', notes);
 app.route('/api/days', days);
 app.route('/api/search', search);

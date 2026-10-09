@@ -16,7 +16,17 @@ export function serviceLabel(a: Appointment): string {
   return `маникюр ${coat(a.manicure_coating)} + педикюр ${coat(a.pedicure_coating)}`;
 }
 
-export function formatDay(date: string, items: Appointment[], note?: string): string {
+export interface ClientContactInfo {
+  phone?: string | null;
+  telegram?: string | null;
+}
+
+export function formatDay(
+  date: string,
+  items: Appointment[],
+  note?: string,
+  clientContacts?: Map<string, ClientContactInfo>,
+): string {
   const [y, m, d] = date.split('-');
   let out = `<b>📅 ${d}.${m}.${y}, ${weekdayRu(date)}</b>\n`;
   if (!items.length) {
@@ -27,6 +37,17 @@ export function formatDay(date: string, items: Appointment[], note?: string): st
       if (a.who) out += ` (${escapeHtml(a.who)})`;
       out += `\n   💅 ${serviceLabel(a)}`;
       if (a.comment) out += `\n   💬 ${escapeHtml(a.comment)}`;
+
+      const contact = clientContacts?.get(a.client_name);
+      if (contact?.phone || contact?.telegram) {
+        const parts: string[] = [];
+        if (contact.phone) parts.push(`📞 ${escapeHtml(contact.phone)}`);
+        if (contact.telegram) {
+          const tgClean = contact.telegram.replace(/^@/, '');
+          parts.push(`💬 <a href="https://t.me/${tgClean}">@${escapeHtml(tgClean)}</a>`);
+        }
+        out += `\n   ${parts.join(' · ')}`;
+      }
       out += '\n';
     }
   }

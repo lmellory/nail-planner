@@ -29,3 +29,105 @@ const WD = ['воскресенье', 'понедельник', 'вторник'
 export function weekdayRu(date: string): string {
   return WD[new Date(date + 'T00:00:00Z').getUTCDay()];
 }
+
+/** Прибавить минуты к времени HH:MM */
+export function addMinutes(timeStr: string, minutes: number): string {
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, total));
+  const outH = Math.floor(clamped / 60);
+  const outM = clamped % 60;
+  return `${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')}`;
+}
+
+export function timeToMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function minutesToTime(mins: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, mins));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Длительность процедуры по умолчанию в минутах */
+export function defaultServiceDuration(service: string): number {
+  if (service === 'manicure') return 120; // 2 ч
+  if (service === 'pedicure') return 90;  // 1.5 ч
+  if (service === 'both') return 210;     // 3.5 ч
+  return 120;
+}
+
+export interface SlotRange {
+  start: string;
+  end: string;
+}
+
+/**
+ * Рассчитывает свободные окна между рабочими часами и существующими записями.
+ * workStart: '09:00', workEnd: '20:00'
+ */
+export function calculateFreeSlots(
+  workStart: string,
+  workEnd: string,
+  busyIntervals: SlotRange[],
+  minDurationMin = 30,
+): { start: string; end: string; duration_minutes: number }[] {
+  const startLimit = timeToMinutes(workStart);
+  const endLimit = timeToMinutes(workEnd);
+  if (endLimit <= startLimit) return [];
+
+  const busy = busyIntervals
+    .map((b) => ({
+      s: Math.max(startLimit, timeToMinutes(b.start)),
+      e: Math.min(endLimit, timeToMinutes(b.end)),
+    }))
+    .filter((b) => b.e > b.s)
+    .sort((a, b) => a.s - b.s);
+
+  const mergedBusy: { s: number; e: number }[] = [];
+  for (const item of busy) {
+    if (!mergedBusy.length) {
+      mergedBusy.push({ ...item });
+      continue;
+    }
+    const last = mergedBusy[mergedBusy.length - 1];
+    if (item.s <= last.e) {
+      last.e = Math.max(last.e, item.e);
+    } else {
+      mergedBusy.push({ ...item });
+    }
+  }
+
+  const freeSlots: { start: string; end: string; duration_minutes: number }[] = [];
+  let current = startLimit;
+
+  for (const b of mergedBusy) {
+    if (b.s > current) {
+      const dur = b.s - current;
+      if (dur >= minDurationMin) {
+        freeSlots.push({
+          start: minutesToTime(current),
+          end: minutesToTime(b.s),
+          duration_minutes: dur,
+        });
+      }
+    }
+    current = Math.max(current, b.e);
+  }
+
+  if (endLimit > current) {
+    const dur = endLimit - current;
+    if (dur >= minDurationMin) {
+      freeSlots.push({
+        start: minutesToTime(current),
+        end: minutesToTime(endLimit),
+        duration_minutes: dur,
+      });
+    }
+  }
+
+  return freeSlots;
+}

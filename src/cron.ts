@@ -14,6 +14,7 @@
 import type { Env } from './types';
 import {
   ensureUser,
+  getClientByName,
   getDayNote,
   getDueMessageDeletes,
   getUser,
@@ -103,7 +104,14 @@ export async function runNotifications(env: Env, appUrl: string) {
         const items = await listAppointments(env.DB, userId, target, target);
         const note = await getDayNote(env.DB, userId, target);
         count = items.length;
-        const text = `🌙 <b>Расписание на завтра</b>\n\n${formatDay(target, items, note)}`;
+
+        const clientContacts = new Map<string, { phone?: string | null; telegram?: string | null }>();
+        for (const item of items) {
+          const cl = await getClientByName(env.DB, userId, item.client_name);
+          if (cl) clientContacts.set(item.client_name, { phone: cl.phone, telegram: cl.telegram });
+        }
+
+        const text = `🌙 <b>Расписание на завтра</b>\n\n${formatDay(target, items, note, clientContacts)}`;
         outcome = classifySend(await sendMessage(env, userId, text, openAppKeyboard(appUrl)));
       } catch (e) {
         console.error('notify send failed', userId, e);

@@ -28,17 +28,26 @@ if (tg) {
 /** Запрос к API. Подпись Telegram передаётся в заголовке X-Init-Data */
 async function api(path, options = {}) {
   const initData = tg?.initData || '';
-  const res = await fetch('/api' + path, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Init-Data': initData,
-      ...(options.headers || {}),
-    },
-  });
+  let res;
+  try {
+    res = await fetch('/api' + path, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Init-Data': initData,
+        ...(options.headers || {}),
+      },
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+    showToast('Ошибка сети');
+    throw err;
+  }
   if (res.status === 403) {
-    showToast('Нет доступа к приложению');
-    throw new Error('Нет доступа');
+    const overlay = document.getElementById('session-expired-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    else showToast('Сессия Telegram устарела. Перезапустите приложение');
+    throw new Error('Сессия устарела');
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -52,6 +61,32 @@ async function api(path, options = {}) {
 // ===== Утилиты для работы с датами и временем =====
 const pad = (n) => String(n).padStart(2, '0');
 const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(mins) {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, mins));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${pad(h)}:${pad(m)}`;
+}
+
+function addMinutes(timeStr, minutes) {
+  if (!timeStr) return '';
+  const total = timeToMinutes(timeStr) + minutes;
+  return minutesToTime(total);
+}
+
+function defaultDurationForService(service) {
+  if (service === 'manicure') return 120;
+  if (service === 'pedicure') return 90;
+  if (service === 'both') return 210;
+  return 120;
+}
 
 function formatApptTime(a) {
   if (!a) return '';
@@ -238,6 +273,9 @@ function goScreen(name) {
     } else if (name === 'settings') {
       if (headerTitle) headerTitle.textContent = 'Настройки';
       tg?.MainButton?.hide();
+    } else if (name === 'clients') {
+      if (headerTitle) headerTitle.textContent = 'Клиенты';
+      tg?.MainButton?.hide();
     }
   }
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -388,12 +426,22 @@ async function loadSelectedDay() {
     sub.textContent = state.selectedDate === todayStr ? formatFullDateRu(state.selectedDate) : '';
   }
 
+  // Защита от race condition: отменяем предыдущий запрос и сверяем seq
+  const reqId = ++currentDayRequestId;
+  if (currentDayAbortCtrl) {
+    try { currentDayAbortCtrl.abort(); } catch {}
+  }
+  currentDayAbortCtrl = new AbortController();
+  const dateToLoad = state.selectedDate;
+
   // Загружаем записи и заметку дня
   try {
     const [appts, noteRes] = await Promise.all([
-      api(`/appointments?from=${state.selectedDate}&to=${state.selectedDate}`),
-      api(`/notes/${state.selectedDate}`),
+      api(`/appointments?from=${dateToLoad}&to=${dateToLoad}`, { signal: currentDayAbortCtrl.signal }),
+      api(`/notes/${dateToLoad}`, { signal: currentDayAbortCtrl.signal }),
     ]);
+
+    if (reqId !== currentDayRequestId || dateToLoad !== state.selectedDate) return;
 
     state.appointments = appts;
     state.currentDayNote = noteRes?.text || '';
@@ -410,11 +458,51 @@ async function loadSelectedDay() {
 
     // Отображение списка записей
     renderAppointmentsList();
+    await loadFreeSlots(dateToLoad);
   } catch (err) {
+    if (err.name === 'AbortError') return;
     console.error('Ошибка загрузки дня:', err);
-    if (listEl) {
+    if (listEl && reqId === currentDayRequestId) {
       listEl.innerHTML = '<div class="empty-state"><p>Ошибка загрузки записей</p></div>';
     }
+  }
+}
+
+let currentDayRequestId = 0;
+let currentDayAbortCtrl = null;
+
+async function loadFreeSlots(dateStr) {
+  const card = document.getElementById('free-slots-card');
+  const countEl = document.getElementById('free-slots-count');
+  const chipsEl = document.getElementById('free-slots-chips');
+  if (!card || !chipsEl) return;
+
+  try {
+    const res = await api(`/days/slots?date=${dateStr}`);
+    if (!res.is_work_day || !res.slots || !res.slots.length) {
+      card.style.display = 'none';
+      return;
+    }
+
+    if (countEl) countEl.textContent = `${res.slots.length}`;
+    chipsEl.innerHTML = '';
+    for (const slot of res.slots) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'slot-chip';
+      const h = Math.floor(slot.duration_minutes / 60);
+      const m = slot.duration_minutes % 60;
+      const durText = h > 0 ? (m > 0 ? `${h}ч ${m}м` : `${h}ч`) : `${m}м`;
+      btn.textContent = `✨ ${slot.start}–${slot.end} (${durText})`;
+      btn.addEventListener('click', () => {
+        haptic('light');
+        openForm({ date: dateStr, start_time: slot.start, duration: 120 });
+      });
+      chipsEl.appendChild(btn);
+    }
+    card.style.display = 'block';
+  } catch {
+    card.style.display = 'none';
   }
 }
 
@@ -488,9 +576,18 @@ function escapeHtml(s) {
 let selectedService = 'manicure';
 let manicureCoating = 'gel';
 let pedicureCoating = 'gel';
+let selectedDuration = 120;
+
+function updateDurationPillsUI() {
+  document.querySelectorAll('#duration-pills .duration-pill').forEach((pill) => {
+    pill.classList.toggle('active', Number(pill.dataset.mins) === selectedDuration);
+  });
+  const durInput = document.getElementById('form-appt-duration');
+  if (durInput) durInput.value = selectedDuration;
+}
 
 function openForm(appt = null) {
-  state.editingAppointmentId = appt ? appt.id : null;
+  state.editingAppointmentId = appt && appt.id ? appt.id : null;
 
   const formTitle = document.getElementById('form-screen-title');
   const apptId = document.getElementById('form-appt-id');
@@ -505,7 +602,7 @@ function openForm(appt = null) {
 
   if (conflictAlert) conflictAlert.style.display = 'none';
 
-  if (appt) {
+  if (appt && appt.id) {
     if (formTitle) formTitle.textContent = 'Редактирование записи';
     if (apptId) apptId.value = appt.id;
     if (dateInput) dateInput.value = appt.date;
@@ -516,36 +613,82 @@ function openForm(appt = null) {
     selectedService = appt.service || 'manicure';
     manicureCoating = appt.manicure_coating || 'gel';
     pedicureCoating = appt.pedicure_coating || 'gel';
+    if (appt.end_time && appt.start_time) {
+      selectedDuration = Math.max(30, timeToMinutes(appt.end_time) - timeToMinutes(appt.start_time));
+    } else {
+      selectedDuration = defaultDurationForService(selectedService);
+    }
     if (deleteBtn) deleteBtn.style.display = 'block';
     if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'block';
   } else {
     if (formTitle) formTitle.textContent = 'Новая запись';
     if (apptId) apptId.value = '';
-    if (dateInput) dateInput.value = state.selectedDate;
+    if (dateInput) dateInput.value = appt?.date || state.selectedDate;
 
-    // Автоматическое удобное начальное время
-    const now = new Date();
-    let defHour = 10;
-    if (state.selectedDate === todayStr) {
-      defHour = Math.min(Math.max(now.getHours() + 1, 9), 20);
+    // Начальное время
+    if (appt?.start_time) {
+      if (startInput) startInput.value = appt.start_time;
+    } else {
+      const now = new Date();
+      let defHour = 10;
+      if (state.selectedDate === todayStr) {
+        defHour = Math.min(Math.max(now.getHours() + 1, 9), 20);
+      }
+      if (startInput) startInput.value = `${pad(defHour)}:00`;
     }
-    const defStart = `${pad(defHour)}:00`;
 
-    if (startInput) startInput.value = defStart;
-    if (clientInput) clientInput.value = '';
+    if (clientInput) clientInput.value = appt?.client_name || '';
     if (whoInput) whoInput.value = '';
     if (commentInput) commentInput.value = '';
     selectedService = 'manicure';
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
+    selectedDuration = appt?.duration || defaultDurationForService(selectedService);
     if (deleteBtn) deleteBtn.style.display = 'none';
     if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'none';
   }
 
   updateServiceAndCoatingUI();
+  updateDurationPillsUI();
+  updateClientMatchBadge();
   goScreen('form');
   checkConflicts();
 }
+
+function updateClientMatchBadge() {
+  const clientInput = document.getElementById('form-appt-client');
+  const badge = document.getElementById('client-match-badge');
+  if (!clientInput || !badge) return;
+
+  const val = clientInput.value.trim().toLowerCase();
+  if (!val) {
+    badge.style.display = 'none';
+    return;
+  }
+
+  const match = cachedClients.find((c) => c.name.toLowerCase() === val);
+  if (match) {
+    const parts = [];
+    if (match.phone) parts.push(`📞 ${match.phone}`);
+    if (match.notes) parts.push(`💬 ${match.notes}`);
+    badge.innerHTML = `✨ <b>Клиент из базы:</b> ${parts.join(' · ') || 'Контакты не указаны'}`;
+    badge.style.display = 'block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+document.getElementById('form-appt-client')?.addEventListener('input', updateClientMatchBadge);
+
+// Переключение чипов длительности
+document.querySelectorAll('#duration-pills .duration-pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    haptic('light');
+    selectedDuration = Number(btn.dataset.mins);
+    updateDurationPillsUI();
+    checkConflicts();
+  });
+});
 
 function updateServiceAndCoatingUI() {
   // Селектор услуги
@@ -582,7 +725,10 @@ document.querySelectorAll('#service-selector .segment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     haptic('light');
     selectedService = btn.dataset.service;
+    selectedDuration = defaultDurationForService(selectedService);
     updateServiceAndCoatingUI();
+    updateDurationPillsUI();
+    checkConflicts();
   });
 });
 
@@ -602,7 +748,7 @@ document.querySelectorAll('#pedicure-coating-selector .coating-chip').forEach((b
   });
 });
 
-// Проверка совпадений по времени перед сохранением
+// Проверка пересечений по времени перед сохранением
 let conflictCheckTimer = null;
 async function checkConflicts() {
   clearTimeout(conflictCheckTimer);
@@ -618,10 +764,18 @@ async function checkConflicts() {
       return;
     }
 
+    const calculatedEnd = addMinutes(start, selectedDuration);
+
     try {
       const res = await api('/appointments/check', {
         method: 'POST',
-        body: JSON.stringify({ date, start_time: start, exclude_id: excludeId }),
+        body: JSON.stringify({
+          date,
+          start_time: start,
+          end_time: calculatedEnd,
+          service: selectedService,
+          exclude_id: excludeId,
+        }),
       });
 
       if (res.conflicts && res.conflicts.length > 0) {
@@ -653,10 +807,12 @@ async function saveAppointment() {
   if (!start_time) return showToast('Укажите время приема');
   if (!client_name) return showToast('Укажите имя клиента');
 
+  const end_time = addMinutes(start_time, selectedDuration);
+
   const payload = {
     date,
     start_time,
-    end_time: null,
+    end_time,
     client_name,
     who,
     service: selectedService,
@@ -683,6 +839,9 @@ async function saveAppointment() {
     haptic('success');
     state.selectedDate = date;
     state.weekStart = fmt(mondayOf(parseDate(date)));
+
+    // Обновляем список клиентов в фоне, чтобы автоподстановка сразу знала нового клиента
+    loadClientsDatalist().catch(() => {});
 
     goScreen('main');
     await loadWeekSummary();
@@ -1029,6 +1188,31 @@ document.getElementById('btn-cancel-note')?.addEventListener('click', () => goSc
 
 // ===== 7. НАСТРОЙКИ И ЭКСПОРТ =====
 
+let selectedWorkDays = [1, 2, 3, 4, 5, 6];
+
+function renderWorkDaysPicker() {
+  document.querySelectorAll('#setting-work-days-picker .day-toggle-pill').forEach((btn) => {
+    const day = Number(btn.dataset.day);
+    btn.classList.toggle('active', selectedWorkDays.includes(day));
+  });
+}
+
+document.querySelectorAll('#setting-work-days-picker .day-toggle-pill').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    haptic('light');
+    const day = Number(btn.dataset.day);
+    if (selectedWorkDays.includes(day)) {
+      if (selectedWorkDays.length > 1) {
+        selectedWorkDays = selectedWorkDays.filter((d) => d !== day);
+      }
+    } else {
+      selectedWorkDays.push(day);
+      selectedWorkDays.sort((a, b) => a - b);
+    }
+    renderWorkDaysPicker();
+  });
+});
+
 async function openSettings() {
   try {
     const s = await api('/settings');
@@ -1036,12 +1220,23 @@ async function openSettings() {
     const newApptCheck = document.getElementById('setting-notify-new-appt');
     const timeInput = document.getElementById('setting-notify-time');
     const tzSelect = document.getElementById('setting-tz');
+    const workStart = document.getElementById('setting-work-start');
+    const workEnd = document.getElementById('setting-work-end');
 
     if (enabledCheck) enabledCheck.checked = !!s.notify_enabled;
     if (newApptCheck) newApptCheck.checked = s.notify_new_appt !== false;
     if (timeInput) timeInput.value = s.notify_time || '22:00';
+    if (workStart) workStart.value = s.work_start_time || '09:00';
+    if (workEnd) workEnd.value = s.work_end_time || '20:00';
+
+    if (s.work_days) {
+      selectedWorkDays = s.work_days.split(',').map((x) => Number(x.trim())).filter(Boolean);
+    } else {
+      selectedWorkDays = [1, 2, 3, 4, 5, 6];
+    }
+    renderWorkDaysPicker();
+
     if (tzSelect && s.tz) {
-      // Если такого часового пояса нет в списке, добавляем опцию
       if (![...tzSelect.options].some((o) => o.value === s.tz)) {
         const opt = document.createElement('option');
         opt.value = s.tz;
@@ -1061,11 +1256,22 @@ async function saveSettings() {
   const notify_new_appt = !!document.getElementById('setting-notify-new-appt')?.checked;
   const notify_time = document.getElementById('setting-notify-time')?.value || '22:00';
   const tz = document.getElementById('setting-tz')?.value || 'Europe/Chisinau';
+  const work_start_time = document.getElementById('setting-work-start')?.value || '09:00';
+  const work_end_time = document.getElementById('setting-work-end')?.value || '20:00';
+  const work_days = selectedWorkDays.join(',');
 
   try {
     await api('/settings', {
       method: 'PUT',
-      body: JSON.stringify({ notify_enabled, notify_time, tz, notify_new_appt }),
+      body: JSON.stringify({
+        notify_enabled,
+        notify_time,
+        tz,
+        notify_new_appt,
+        work_start_time,
+        work_end_time,
+        work_days,
+      }),
     });
     haptic('success');
     showToast('Настройки сохранены ✅');
@@ -1093,7 +1299,292 @@ async function exportData(format = 'csv') {
 
 document.getElementById('btn-save-settings')?.addEventListener('click', saveSettings);
 document.getElementById('btn-export-csv')?.addEventListener('click', () => exportData('csv'));
-document.getElementById('btn-export-json')?.addEventListener('click', () => exportData('json'));
+
+// ===== 8. БАЗА КЛИЕНТОВ =====
+
+let cachedClients = [];
+let currentViewingClientId = null;
+
+async function loadClientsDatalist() {
+  try {
+    cachedClients = await api('/clients');
+    const dl = document.getElementById('clients-datalist');
+    if (!dl) return;
+    dl.innerHTML = '';
+    for (const c of cachedClients) {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      if (c.phone) opt.label = c.phone;
+      dl.appendChild(opt);
+    }
+  } catch (e) {
+    console.error('Ошибка обновления подсказок клиентов', e);
+  }
+}
+
+async function loadClients(search = '') {
+  const listEl = document.getElementById('clients-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="loading-spinner">Загрузка клиентов…</div>';
+
+  try {
+    cachedClients = await api(`/clients?q=${encodeURIComponent(search)}`);
+    renderClientsList(cachedClients);
+  } catch (err) {
+    console.error('Ошибка загрузки клиентов:', err);
+    listEl.innerHTML = '<div class="empty-state"><p>Ошибка загрузки клиентов</p></div>';
+  }
+}
+
+function renderClientsList(items) {
+  const listEl = document.getElementById('clients-list');
+  if (!listEl) return;
+
+  if (!items || !items.length) {
+    listEl.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-emoji">👥</div>
+        <div class="empty-state-title">Клиентов пока нет</div>
+        <p>Нажмите «+ Новый», чтобы добавить клиента в базу</p>
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = '';
+  for (const c of items) {
+    const card = document.createElement('div');
+    card.className = 'client-card';
+
+    const contacts = [];
+    if (c.phone) contacts.push(`📞 ${escapeHtml(c.phone)}`);
+    if (c.telegram) contacts.push(`💬 @${escapeHtml(c.telegram.replace(/^@/, ''))}`);
+    if (c.last_visit) contacts.push(`Посл. визит: ${c.last_visit}`);
+
+    const noteHtml = c.notes ? `<div class="client-card-note">💡 ${escapeHtml(c.notes)}</div>` : '';
+
+    card.innerHTML = `
+      <div class="client-card-top">
+        <span class="client-card-name">${escapeHtml(c.name)}</span>
+        <span class="client-card-visits">${c.appointments_count || 0} виз.</span>
+      </div>
+      <div class="client-card-contacts">${contacts.join(' · ') || 'Контакты не указаны'}</div>
+      ${noteHtml}
+    `;
+
+    card.addEventListener('click', () => {
+      haptic('light');
+      openClientView(c.id);
+    });
+
+    listEl.appendChild(card);
+  }
+}
+
+async function openClientView(id) {
+  currentViewingClientId = id;
+  const modal = document.getElementById('modal-client-view');
+  const nameEl = document.getElementById('modal-client-name');
+  const phoneRow = document.getElementById('client-view-phone-row');
+  const phoneLink = document.getElementById('client-view-phone-link');
+  const tgRow = document.getElementById('client-view-tg-row');
+  const tgLink = document.getElementById('client-view-tg-link');
+  const notesBox = document.getElementById('client-view-notes-box');
+  const notesText = document.getElementById('client-view-notes-text');
+  const historyCount = document.getElementById('client-history-count');
+  const historyList = document.getElementById('client-history-list');
+
+  try {
+    const data = await api(`/clients/${id}`);
+    const client = data.client;
+    const history = data.history || [];
+
+    if (nameEl) nameEl.textContent = client.name;
+
+    if (client.phone && phoneRow && phoneLink) {
+      phoneRow.style.display = 'flex';
+      phoneLink.textContent = client.phone;
+      phoneLink.href = `tel:${client.phone}`;
+    } else if (phoneRow) {
+      phoneRow.style.display = 'none';
+    }
+
+    if (client.telegram && tgRow && tgLink) {
+      const cleanTg = client.telegram.replace(/^@/, '');
+      tgRow.style.display = 'flex';
+      tgLink.textContent = `@${cleanTg}`;
+      tgLink.href = `https://t.me/${cleanTg}`;
+    } else if (tgRow) {
+      tgRow.style.display = 'none';
+    }
+
+    if (client.notes && notesBox && notesText) {
+      notesBox.style.display = 'block';
+      notesText.textContent = client.notes;
+    } else if (notesBox) {
+      notesBox.style.display = 'none';
+    }
+
+    if (historyCount) historyCount.textContent = `${history.length}`;
+    if (historyList) {
+      if (!history.length) {
+        historyList.innerHTML = '<div style="color: var(--hint-color); font-size: 13px;">Записей пока нет</div>';
+      } else {
+        historyList.innerHTML = '';
+        for (const a of history) {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          let sRu = a.service === 'manicure' ? 'Маникюр' : a.service === 'pedicure' ? 'Педикюр' : 'Маникюр + Педикюр';
+          item.innerHTML = `
+            <span><b>${a.date}</b> (${formatApptTime(a)}) · ${sRu}</span>
+            ${a.comment ? `<span style="color: var(--hint-color);">💬</span>` : ''}
+          `;
+          historyList.appendChild(item);
+        }
+      }
+    }
+
+    if (modal) modal.style.display = 'flex';
+  } catch (err) {
+    console.error('Ошибка загрузки карточки клиента:', err);
+  }
+}
+
+function closeClientView() {
+  const modal = document.getElementById('modal-client-view');
+  if (modal) modal.style.display = 'none';
+}
+
+function openClientEdit(client = null) {
+  closeClientView();
+  const modal = document.getElementById('modal-client-edit');
+  const title = document.getElementById('modal-client-edit-title');
+  const idInput = document.getElementById('edit-client-id');
+  const nameInput = document.getElementById('edit-client-name');
+  const phoneInput = document.getElementById('edit-client-phone');
+  const tgInput = document.getElementById('edit-client-tg');
+  const notesInput = document.getElementById('edit-client-notes');
+
+  if (client) {
+    if (title) title.textContent = 'Редактировать клиента';
+    if (idInput) idInput.value = client.id;
+    if (nameInput) nameInput.value = client.name;
+    if (phoneInput) phoneInput.value = client.phone || '';
+    if (tgInput) tgInput.value = client.telegram || '';
+    if (notesInput) notesInput.value = client.notes || '';
+  } else {
+    if (title) title.textContent = 'Новый клиент';
+    if (idInput) idInput.value = '';
+    if (nameInput) nameInput.value = '';
+    if (phoneInput) phoneInput.value = '';
+    if (tgInput) tgInput.value = '';
+    if (notesInput) notesInput.value = '';
+  }
+
+  if (modal) modal.style.display = 'flex';
+  setTimeout(() => nameInput?.focus(), 100);
+}
+
+function closeClientEdit() {
+  const modal = document.getElementById('modal-client-edit');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveClientModal() {
+  const id = document.getElementById('edit-client-id')?.value;
+  const name = document.getElementById('edit-client-name')?.value?.trim();
+  const phone = document.getElementById('edit-client-phone')?.value?.trim() || null;
+  const telegram = document.getElementById('edit-client-tg')?.value?.trim() || null;
+  const notes = document.getElementById('edit-client-notes')?.value?.trim() || null;
+
+  if (!name) return showToast('Укажите имя клиента');
+
+  try {
+    if (id) {
+      await api(`/clients/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, phone, telegram, notes }),
+      });
+      showToast('Клиент обновлён ✅');
+    } else {
+      await api('/clients', {
+        method: 'POST',
+        body: JSON.stringify({ name, phone, telegram, notes }),
+      });
+      showToast('Клиент добавлен ✅');
+    }
+
+    haptic('success');
+    closeClientEdit();
+    await loadClients();
+    await loadClientsDatalist();
+  } catch (err) {
+    console.error('Ошибка сохранения клиента:', err);
+  }
+}
+
+async function deleteClientModal() {
+  if (!currentViewingClientId) return;
+  confirmDialog('Удалить этого клиента из базы?', async (confirmed) => {
+    if (!confirmed) return;
+    try {
+      await api(`/clients/${currentViewingClientId}`, { method: 'DELETE' });
+      haptic('success');
+      showToast('Клиент удалён');
+      closeClientView();
+      await loadClients();
+      await loadClientsDatalist();
+    } catch (err) {
+      console.error('Ошибка удаления клиента:', err);
+    }
+  });
+}
+
+// Поиск клиентов в реальном времени
+let clientSearchDebounce = null;
+document.getElementById('input-clients-search')?.addEventListener('input', (e) => {
+  clearTimeout(clientSearchDebounce);
+  const q = e.target.value;
+  clientSearchDebounce = setTimeout(() => {
+    loadClients(q);
+  }, 250);
+});
+
+// События кнопок модуля клиентов
+document.getElementById('btn-open-clients')?.addEventListener('click', () => {
+  haptic('light');
+  goScreen('clients');
+  loadClients();
+});
+document.getElementById('btn-back-from-clients')?.addEventListener('click', () => {
+  haptic('light');
+  goScreen('main');
+});
+document.getElementById('btn-add-client')?.addEventListener('click', () => {
+  haptic('light');
+  openClientEdit(null);
+});
+document.getElementById('btn-close-client-view')?.addEventListener('click', closeClientView);
+document.getElementById('btn-close-client-edit')?.addEventListener('click', closeClientEdit);
+document.getElementById('btn-cancel-client-edit')?.addEventListener('click', closeClientEdit);
+document.getElementById('btn-save-client')?.addEventListener('click', saveClientModal);
+
+document.getElementById('btn-client-edit')?.addEventListener('click', () => {
+  const client = cachedClients.find((c) => c.id === currentViewingClientId);
+  if (client) openClientEdit(client);
+});
+document.getElementById('btn-client-delete')?.addEventListener('click', deleteClientModal);
+document.getElementById('btn-client-book')?.addEventListener('click', () => {
+  const client = cachedClients.find((c) => c.id === currentViewingClientId);
+  closeClientView();
+  haptic('light');
+  openForm({ client_name: client?.name || '' });
+});
+
+// Кнопка перезапуска при истекшей сессии
+document.getElementById('btn-reload-app')?.addEventListener('click', () => {
+  window.location.reload();
+});
 
 // Навигационные кнопки в шапке
 document.getElementById('btn-open-calendar')?.addEventListener('click', () => {
@@ -1119,13 +1610,15 @@ document.getElementById('btn-today')?.addEventListener('click', () => {
   selectDate(todayStr);
 });
 
-// ===== 8. ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ =====
+// ===== 9. ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ =====
 
 async function init() {
   updateGreeting();
   goScreen('main');
+  loadClientsDatalist().catch(() => {});
   await loadWeekSummary();
   await loadSelectedDay();
 }
 
 init();
+

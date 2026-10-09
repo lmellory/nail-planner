@@ -2,7 +2,13 @@
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
 import { isDate, weekdayRu } from '../lib/time';
-import { deleteDayNote, getDayNote, upsertDayNote } from '../db';
+import {
+  NEW_APPT_MSG_TTL_SEC,
+  deleteDayNote,
+  getDayNote,
+  scheduleMessageDelete,
+  upsertDayNote,
+} from '../db';
 import { escapeHtml, sendMessage } from '../bot/telegram';
 
 export const notes = new Hono<{ Bindings: Env; Variables: AppVars }>();
@@ -33,7 +39,19 @@ notes.put('/:date', async (c) => {
   if (text !== previous) {
     const [y, m, d] = date.split('-');
     const msg = `📝 <b>Заметка на ${d}.${m}.${y} (${weekdayRu(date)}):</b>\n\n${escapeHtml(text)}`;
-    await sendMessage(c.env, uid, msg).catch((e) => console.error('Ошибка отправки заметки в бот:', e));
+    const notify = (async () => {
+      const r = await sendMessage(c.env, uid, msg);
+      const messageId = r.result?.message_id;
+      if (r.ok && typeof messageId === 'number') {
+        await scheduleMessageDelete(c.env.DB, uid, messageId, NEW_APPT_MSG_TTL_SEC);
+      }
+    })().catch((e) => console.error('Ошибка отправки заметки в бот:', e));
+
+    try {
+      c.executionCtx.waitUntil(notify);
+    } catch {
+      await notify;
+    }
   }
   return c.json({ ok: true });
 });

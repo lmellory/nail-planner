@@ -6,8 +6,8 @@ export function createTursoD1(url: string, authToken: string): D1Database {
 
   class TursoPreparedStatement implements D1PreparedStatement {
     constructor(
-      private sql: string,
-      private params: any[] = [],
+      public sql: string,
+      public params: any[] = [],
     ) {}
 
     bind(...values: any[]): D1PreparedStatement {
@@ -76,11 +76,23 @@ export function createTursoD1(url: string, authToken: string): D1Database {
       throw new Error('Not implemented');
     },
     async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
-      const results: D1Result<T>[] = [];
-      for (const stmt of statements) {
-        results.push(await stmt.all<T>());
-      }
-      return results;
+      const inStmts = statements.map((stmt) => {
+        const s = stmt as any;
+        return { sql: s.sql, args: s.params || [] };
+      });
+      const batchRes = await client.batch(inStmts, 'write');
+      return batchRes.map((res) => ({
+        results: res.rows as unknown as T[],
+        success: true,
+        meta: {
+          changes: res.rowsAffected,
+          last_row_id: Number(res.lastInsertRowid ?? 0),
+          duration: 0,
+          rows_read: res.rows.length,
+          rows_written: res.rowsAffected,
+          size_after: 0,
+        } as any,
+      }));
     },
     async exec(query: string): Promise<D1ExecResult> {
       await client.executeMultiple(query);

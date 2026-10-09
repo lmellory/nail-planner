@@ -13,6 +13,9 @@ settings.get('/', async (c) => {
     notify_time: u.notify_time,
     tz: u.tz,
     notify_new_appt: !!u.notify_new_appt,
+    work_start_time: u.work_start_time || '09:00',
+    work_end_time: u.work_end_time || '20:00',
+    work_days: u.work_days || '1,2,3,4,5,6',
   });
 });
 
@@ -22,13 +25,20 @@ settings.put('/', async (c) => {
     return c.json({ error: 'Некорректное тело запроса' }, 400);
   }
 
-  const { notify_enabled, notify_time, tz, notify_new_appt } = body as Record<string, unknown>;
+  const {
+    notify_enabled,
+    notify_time,
+    tz,
+    notify_new_appt,
+    work_start_time,
+    work_end_time,
+    work_days,
+  } = body as Record<string, unknown>;
 
   if (typeof notify_enabled !== 'boolean') {
     return c.json({ error: 'notify_enabled должен быть булевым значением' }, 400);
   }
 
-  // Необязательное поле: старые клиенты его не шлют, тогда значение не меняется
   if (notify_new_appt !== undefined && typeof notify_new_appt !== 'boolean') {
     return c.json({ error: 'notify_new_appt должен быть булевым значением' }, 400);
   }
@@ -37,24 +47,16 @@ settings.put('/', async (c) => {
     return c.json({ error: 'notify_time должен быть формата HH:MM' }, 400);
   }
 
-  if (typeof tz !== 'string') {
-    return c.json({ error: 'Некорректный часовой пояс' }, 400);
+  if (work_start_time !== undefined && !isTime(work_start_time)) {
+    return c.json({ error: 'work_start_time должен быть формата HH:MM' }, 400);
   }
 
-  const getSupportedTimezones = (): Set<string> | null => {
-    try {
-      if (typeof (Intl as any).supportedValuesOf === 'function') {
-        return new Set<string>((Intl as any).supportedValuesOf('timeZone'));
-      }
-    } catch {
-      // fallback
-    }
-    return null;
-  };
+  if (work_end_time !== undefined && !isTime(work_end_time)) {
+    return c.json({ error: 'work_end_time должен быть формата HH:MM' }, 400);
+  }
 
-  const supported = getSupportedTimezones();
-  if (supported && !supported.has(tz)) {
-    return c.json({ error: 'Неподдерживаемый часовой пояс' }, 400);
+  if (typeof tz !== 'string') {
+    return c.json({ error: 'Некорректный часовой пояс' }, 400);
   }
 
   try {
@@ -70,6 +72,9 @@ settings.put('/', async (c) => {
     notify_time,
     tz,
     notify_new_appt: notify_new_appt === undefined ? current.notify_new_appt : notify_new_appt,
+    work_start_time: typeof work_start_time === 'string' ? work_start_time : current.work_start_time,
+    work_end_time: typeof work_end_time === 'string' ? work_end_time : current.work_end_time,
+    work_days: typeof work_days === 'string' ? work_days : current.work_days,
   });
 
   return c.json({
@@ -77,5 +82,8 @@ settings.put('/', async (c) => {
     notify_time: updated.notify_time,
     tz: updated.tz,
     notify_new_appt: !!updated.notify_new_appt,
+    work_start_time: updated.work_start_time || '09:00',
+    work_end_time: updated.work_end_time || '20:00',
+    work_days: updated.work_days || '1,2,3,4,5,6',
   });
 });

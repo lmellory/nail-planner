@@ -7,11 +7,16 @@ import { nowInTz } from '../lib/time';
 
 export const exporter = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
-function csvEscape(val: unknown): string {
+export function csvEscape(val: unknown): string {
   if (val === null || val === undefined) return '';
   let str = String(val);
   // Защита от CSV-инъекции: Excel выполнит ячейку, начинающуюся с = + - @ как формулу
-  if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+  // Но если это телефонный номер (+цифры, скобки, пробелы), не ломаем его апострофом
+  if (/^[=+\-@\t\r]/.test(str)) {
+    if (!/^\+[\d\s()\-]+$/.test(str)) {
+      str = `'${str}`;
+    }
+  }
   if (/[;"\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

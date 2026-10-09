@@ -4,6 +4,7 @@ import type { AppVars, Env } from '../types';
 import {
   NEW_APPT_MSG_TTL_SEC,
   deleteAppointment,
+  ensureClientExists,
   ensureUser,
   findConflicts,
   getAppointment,
@@ -12,7 +13,7 @@ import {
   scheduleMessageDelete,
   updateAppointment,
 } from '../db';
-import { isDate, isTime } from '../lib/time';
+import { addMinutes, defaultServiceDuration, isDate, isTime } from '../lib/time';
 import { escapeHtml, sendMessage } from '../bot/telegram';
 import { serviceLabel, timeLabel } from '../lib/format';
 
@@ -22,14 +23,18 @@ const SERVICES = ['manicure', 'pedicure', 'both'];
 const COATINGS = ['gel', 'none'];
 
 /** Проверка и нормализация тела запроса. Возвращает [данные, ошибка]. */
-function validate(b: any) {
+export function validate(b: any) {
   if (!isDate(b?.date)) return [null, 'Некорректная дата'] as const;
   if (!isTime(b?.start_time)) return [null, 'Некорректное время'] as const;
-  const endTime = isTime(b?.end_time) ? (b.end_time as string) : null;
-  if (endTime && endTime <= b.start_time) return [null, 'Конец должен быть позже начала'] as const;
-  const name = String(b.client_name ?? '').trim();
+  const name = String(b?.client_name ?? '').trim();
   if (!name) return [null, 'Укажи имя клиента'] as const;
-  if (!SERVICES.includes(b.service)) return [null, 'Некорректная услуга'] as const;
+  if (!SERVICES.includes(b?.service)) return [null, 'Некорректная услуга'] as const;
+
+  let endTime = isTime(b?.end_time) ? (b.end_time as string) : null;
+  if (!endTime) {
+    endTime = addMinutes(b.start_time, defaultServiceDuration(b.service));
+  }
+  if (endTime <= b.start_time) return [null, 'Конец должен быть позже начала'] as const;
 
   const needM = b.service === 'manicure' || b.service === 'both';
   const needP = b.service === 'pedicure' || b.service === 'both';
@@ -59,12 +64,15 @@ appointments.get('/', async (c) => {
 });
 
 // POST /api/appointments/check — проверка пересечений до сохранения (для предупреждения в форме).
-// Пока форма заполнена не до конца — просто отвечаем «пересечений нет», без ошибки.
 appointments.post('/check', async (c) => {
   const b: any = await c.req.json().catch(() => null);
   if (!isDate(b?.date) || !isTime(b?.start_time)) return c.json({ conflicts: [] });
+  const service = SERVICES.includes(b?.service) ? b.service : 'manicure';
+  const endTime = isTime(b?.end_time)
+    ? (b.end_time as string)
+    : addMinutes(b.start_time, defaultServiceDuration(service));
   const conflicts = await findConflicts(
-    c.env.DB, c.get('userId'), b.date, b.start_time, Number(b.exclude_id) || 0,
+    c.env.DB, c.get('userId'), b.date, b.start_time, endTime, Number(b.exclude_id) || 0,
   );
   return c.json({ conflicts });
 });
@@ -76,7 +84,15 @@ appointments.post('/', async (c) => {
   if (!d) return c.json({ error: err }, 400);
 
   const id = await insertAppointment(c.env.DB, userId, d);
-  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, id);
+  await ensureClientExists(c.env.DB, userId, d.client_name, d.who).catch(() => {});
+  const conflicts = await findConflicts(
+    c.env.DB,
+    userId,
+    d.date,
+    d.start_time,
+    d.end_time ?? addMinutes(d.start_time, 120),
+    id,
+  );
 
   // Уведомление мастера в Telegram о новой записи (только если включено в настройках).
   // Отправляем в фоне: не задерживает ответ, ошибки не ломают сохранение.
@@ -114,7 +130,15 @@ appointments.put('/:id', async (c) => {
   const [d, err] = validate(await c.req.json().catch(() => null));
   if (!d) return c.json({ error: err }, 400);
   await updateAppointment(c.env.DB, userId, id, d);
-  const conflicts = await findConflicts(c.env.DB, userId, d.date, d.start_time, id);
+  await ensureClientExists(c.env.DB, userId, d.client_name, d.who).catch(() => {});
+  const conflicts = await findConflicts(
+    c.env.DB,
+    userId,
+    d.date,
+    d.start_time,
+    d.end_time ?? addMinutes(d.start_time, 120),
+    id,
+  );
   return c.json({ ok: true, conflicts });
 });
 

@@ -29,6 +29,14 @@
         <h1 class="header-title" id="header-title">Ежедневник</h1>
       </div>
       <div class="header-actions" id="header-actions">
+        <button type="button" class="icon-btn" id="btn-open-clients" title="Клиенты">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </button>
         <button type="button" class="icon-btn" id="btn-open-search" title="Поиск клиента">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
@@ -108,6 +116,15 @@
           <p class="day-note-content" id="day-note-content"></p>
         </div>
 
+        <!-- Свободные окна дня -->
+        <div class="free-slots-card" id="free-slots-card" style="display: none;">
+          <div class="free-slots-header">
+            <span class="free-slots-title">✨ Свободные окна:</span>
+            <span class="free-slots-badge" id="free-slots-count"></span>
+          </div>
+          <div class="free-slots-chips" id="free-slots-chips"></div>
+        </div>
+
         <!-- Список записей выбранного дня -->
         <div class="appointments-list" id="appointments-list">
           <div class="loading-spinner">Загрузка записей…</div>
@@ -149,16 +166,30 @@
             <input type="date" id="form-appt-date" class="form-input" required>
           </div>
 
-          <!-- Время приема -->
+          <!-- Время приема и авто-длительность -->
           <div class="form-group">
             <label for="form-appt-start">Время приема *</label>
             <input type="time" id="form-appt-start" class="form-input time-single-input" required>
+            <div class="duration-row">
+              <span class="duration-caption">⏱ Длительность:</span>
+              <div class="duration-pills" id="duration-pills">
+                <button type="button" class="duration-pill" data-mins="60">1 ч</button>
+                <button type="button" class="duration-pill" data-mins="90">1.5 ч</button>
+                <button type="button" class="duration-pill active" data-mins="120">2 ч</button>
+                <button type="button" class="duration-pill" data-mins="150">2.5 ч</button>
+                <button type="button" class="duration-pill" data-mins="180">3 ч</button>
+                <button type="button" class="duration-pill" data-mins="210">3.5 ч</button>
+              </div>
+            </div>
+            <input type="hidden" id="form-appt-duration" value="120">
           </div>
 
-          <!-- Имя клиента -->
+          <!-- Имя клиента с автоподстановкой из базы клиентов -->
           <div class="form-group">
             <label for="form-appt-client">Имя клиента *</label>
-            <input type="text" id="form-appt-client" class="form-input" placeholder="Например: Анна" maxlength="100" required>
+            <input type="text" id="form-appt-client" list="clients-datalist" class="form-input" placeholder="Например: Анна" maxlength="100" autocomplete="off" required>
+            <datalist id="clients-datalist"></datalist>
+            <div class="client-match-badge" id="client-match-badge" style="display: none;"></div>
           </div>
 
           <!-- Кто это / откуда человек -->
@@ -322,6 +353,34 @@
             </select>
           </div>
 
+          <!-- Блок графика работы и свободных окон -->
+          <div class="settings-card-title" style="margin-top: 18px;">⏰ Рабочий график и свободные окна</div>
+          <p class="settings-card-desc">Используется для расчёта свободных окон в расписании на каждый день.</p>
+
+          <div class="time-range-row">
+            <div class="form-group" style="flex: 1;">
+              <label for="setting-work-start">Начало смены</label>
+              <input type="time" id="setting-work-start" class="form-input" value="09:00">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="setting-work-end">Конец смены</label>
+              <input type="time" id="setting-work-end" class="form-input" value="20:00">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Рабочие дни недели</label>
+            <div class="work-days-picker" id="setting-work-days-picker">
+              <button type="button" class="day-toggle-pill active" data-day="1">Пн</button>
+              <button type="button" class="day-toggle-pill active" data-day="2">Вт</button>
+              <button type="button" class="day-toggle-pill active" data-day="3">Ср</button>
+              <button type="button" class="day-toggle-pill active" data-day="4">Чт</button>
+              <button type="button" class="day-toggle-pill active" data-day="5">Пт</button>
+              <button type="button" class="day-toggle-pill active" data-day="6">Сб</button>
+              <button type="button" class="day-toggle-pill" data-day="7">Вс</button>
+            </div>
+          </div>
+
           <button type="button" class="btn-primary" id="btn-save-settings">Сохранить настройки</button>
         </div>
 
@@ -342,6 +401,107 @@
         </div>
       </div>
     </section>
+
+    <!-- ЭКРАН 7: База клиентов -->
+    <section class="screen" id="screen-clients">
+      <div class="screen-content">
+        <div class="screen-sub-header">
+          <button type="button" class="btn-subtle" id="btn-back-from-clients">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            Назад
+          </button>
+          <h2>Клиенты</h2>
+          <button type="button" class="btn-primary-small" id="btn-add-client">+ Новый</button>
+        </div>
+
+        <div class="search-input-wrap">
+          <input type="search" id="input-clients-search" class="form-input search-input" placeholder="Поиск по имени или контактам…" autocomplete="off">
+        </div>
+
+        <div class="clients-list" id="clients-list">
+          <div class="loading-spinner">Загрузка клиентов…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- МОДАЛКА: Карточка клиента -->
+    <div class="modal-overlay" id="modal-client-view" style="display: none;">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3 id="modal-client-name">Клиент</h3>
+          <button type="button" class="modal-close-btn" id="btn-close-client-view">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-client-body">
+          <div class="client-meta-card">
+            <div class="client-contact-row" id="client-view-phone-row" style="display: none;">
+              <span class="contact-icon">📞</span>
+              <a href="#" id="client-view-phone-link" class="contact-link"></a>
+            </div>
+            <div class="client-contact-row" id="client-view-tg-row" style="display: none;">
+              <span class="contact-icon">💬</span>
+              <a href="#" target="_blank" id="client-view-tg-link" class="contact-link"></a>
+            </div>
+            <div class="client-notes-box" id="client-view-notes-box" style="display: none;">
+              <span class="notes-caption">Заметка мастера:</span>
+              <p id="client-view-notes-text"></p>
+            </div>
+          </div>
+
+          <div class="client-history-section">
+            <h4>История визитов (<span id="client-history-count">0</span>)</h4>
+            <div class="client-history-list" id="client-history-list"></div>
+          </div>
+        </div>
+        <div class="modal-actions-grid">
+          <button type="button" class="btn btn-primary" id="btn-client-book">💅 Записать</button>
+          <button type="button" class="btn btn-secondary" id="btn-client-edit">✏️ Изменить</button>
+          <button type="button" class="btn btn-danger" id="btn-client-delete">🗑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- МОДАЛКА: Создание / Редактирование клиента -->
+    <div class="modal-overlay" id="modal-client-edit" style="display: none;">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3 id="modal-client-edit-title">Новый клиент</h3>
+          <button type="button" class="modal-close-btn" id="btn-close-client-edit">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="edit-client-id">
+          <div class="form-group">
+            <label for="edit-client-name">Имя *</label>
+            <input type="text" id="edit-client-name" class="form-input" placeholder="Например: Мария" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-client-phone">Телефон</label>
+            <input type="tel" id="edit-client-phone" class="form-input" placeholder="+373 60 123456 или +7 999 123-45-67">
+          </div>
+          <div class="form-group">
+            <label for="edit-client-tg">Telegram</label>
+            <input type="text" id="edit-client-tg" class="form-input" placeholder="@username">
+          </div>
+          <div class="form-group">
+            <label for="edit-client-notes">Заметка мастера</label>
+            <textarea id="edit-client-notes" class="form-textarea" rows="3" placeholder="Особенности ногтей, аллергии, любимый дизайн…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-client-edit">Отмена</button>
+          <button type="button" class="btn btn-primary" id="btn-save-client">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- МОДАЛКА: Истекшая сессия (24 часа) -->
+    <div class="session-expired-overlay" id="session-expired-overlay" style="display: none;">
+      <div class="session-expired-card">
+        <div class="session-expired-icon">⏳</div>
+        <h3>Сессия устарела</h3>
+        <p>Прошло больше 24 часов с открытия приложения. Пожалуйста, обновите страницу для продолжения работы.</p>
+        <button type="button" class="btn btn-primary" id="btn-reload-app">🔄 Обновить приложение</button>
+      </div>
+    </div>
 
     <!-- Всплывающий тост для уведомлений -->
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

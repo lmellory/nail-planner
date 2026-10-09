@@ -36,6 +36,29 @@ export interface UserRow {
   notify_time: string;
   last_notified_date: string | null;
   notify_new_appt: number;
+  work_start_time?: string; // '09:00'
+  work_end_time?: string;   // '20:00'
+  work_days?: string;       // '1,2,3,4,5,6' (1=Пн, 7=Вс)
+}
+
+export interface Client {
+  id: number;
+  user_id: number;
+  name: string;
+  phone: string | null;
+  telegram: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  appointments_count?: number;
+  last_visit?: string | null;
+  next_visit?: string | null;
+}
+
+export interface FreeSlot {
+  start: string;
+  end: string;
+  duration_minutes: number;
 }
 
 // Переменные Hono-контекста (кладём туда проверенный user_id)
