@@ -278,7 +278,9 @@ function goScreen(name) {
       tg?.MainButton?.hide();
     }
   }
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  window.scrollTo(0, 0);
+  document.body.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
 }
 
 // Подключаем слушатели навигации Telegram WebApp
@@ -877,6 +879,7 @@ document.getElementById('btn-quick-tomorrow')?.addEventListener('click', () => {
   showToast('Дата сдвинута на +1 день ⏩');
   checkConflicts();
 });
+document.getElementById('btn-submit-appt')?.addEventListener('click', saveAppointment);
 document.getElementById('btn-delete-appt')?.addEventListener('click', deleteAppointment);
 document.getElementById('btn-cancel-appt')?.addEventListener('click', () => goScreen('main'));
 document.getElementById('btn-add-appt')?.addEventListener('click', () => {

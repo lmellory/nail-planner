@@ -70,30 +70,26 @@
 
 html {
   width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  overscroll-behavior: none;
-  overscroll-behavior-x: none;
+  height: 100%;
   -webkit-text-size-adjust: 100%;
   background-color: var(--bg-color);
 }
 
 body {
   width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  overscroll-behavior: none;
-  overscroll-behavior-x: none;
-  touch-action: pan-y;
+  min-height: 100%;
+  height: 100%;
   background-color: var(--bg-color);
   color: var(--text-color);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.45;
-  user-select: none;
-  -webkit-user-select: none;
-  min-height: 100vh;
-  padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 80px);
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-y !important;
+  padding-bottom: calc(max(var(--tg-content-safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px), 16px) + 90px);
   position: relative;
 }
 
@@ -102,8 +98,7 @@ body {
   max-width: 640px;
   margin: 0 auto;
   position: relative;
-  min-height: 100vh;
-  overflow-x: hidden;
+  min-height: 100%;
 }
 
 /* --------------------------------------------------------------------------
@@ -173,7 +168,6 @@ body {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow-x: hidden;
   transform: translateY(6px);
   transition: opacity var(--transition-normal), transform var(--transition-normal);
 }
@@ -583,7 +577,7 @@ body {
 .fab-btn {
   position: fixed;
   right: 20px;
-  bottom: calc(env(safe-area-inset-bottom, 20px) + 24px);
+  bottom: calc(max(var(--tg-content-safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px), 16px) + 24px);
   width: 58px;
   height: 58px;
   border-radius: var(--radius-full);

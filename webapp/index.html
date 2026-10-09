@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ежедневник мастера</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
@@ -234,6 +234,7 @@
 
           <!-- Кнопки формы -->
           <div class="form-actions">
+            <button type="button" class="btn-primary" id="btn-submit-appt">Сохранить запись</button>
             <button type="button" class="btn-secondary" id="btn-quick-tomorrow" style="display: none;">⏩ Перенести на завтра (+1 день)</button>
             <button type="button" class="btn-secondary" id="btn-cancel-appt">Отмена</button>
             <button type="button" class="btn-danger" id="btn-delete-appt" style="display: none;">Удалить запись</button>
