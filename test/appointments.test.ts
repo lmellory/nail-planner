@@ -58,6 +58,31 @@ describe('validate appointment input', () => {
     expect(data?.pedicure_coating).toBeNull();
   });
 
+  describe('цена', () => {
+    const base = { date: '2026-10-15', start_time: '10:00', client_name: 'Инна', service: 'fingers' };
+
+    it('не указана → null', () => {
+      expect(validate(base)[0]?.price).toBeNull();
+      expect(validate({ ...base, price: '' })[0]?.price).toBeNull();
+      expect(validate({ ...base, price: null })[0]?.price).toBeNull();
+    });
+
+    it('принимает число, строку и строку с пробелами', () => {
+      expect(validate({ ...base, price: 800 })[0]?.price).toBe(800);
+      expect(validate({ ...base, price: '1200' })[0]?.price).toBe(1200);
+      expect(validate({ ...base, price: '1 500' })[0]?.price).toBe(1500);
+      expect(validate({ ...base, price: 0 })[0]?.price).toBe(0);
+    });
+
+    it('отклоняет дробные, отрицательные, слишком большие и нечисловые значения', () => {
+      for (const price of [12.5, -1, 10_000_001, 'abc', NaN]) {
+        const [d, err] = validate({ ...base, price });
+        expect(d).toBeNull();
+        expect(err).toContain('Цена');
+      }
+    });
+  });
+
   it('сохраняет переданный явный end_time, если он корректен', () => {
     const input = {
       date: '2026-10-15',

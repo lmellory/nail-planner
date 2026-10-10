@@ -1566,3 +1566,166 @@ body {
 }
 
 
+
+
+/* ==========================================================================
+   Доходы
+   ========================================================================== */
+.income-header-spacer { width: 32px; }
+
+.income-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0 12px;
+}
+
+.income-nav-label {
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.income-total-card {
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--card-shadow);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.income-total-label {
+  font-size: 13px;
+  color: var(--hint-color);
+  margin-bottom: 4px;
+}
+
+.income-total-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--powder-600);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+:root.dark-theme .income-total-value { color: var(--powder-300); }
+
+.income-delta {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 6px;
+  min-height: 16px;
+  color: var(--hint-color);
+}
+.income-delta.up { color: #2e9a62; }
+.income-delta.down { color: var(--danger-color); }
+
+.income-chart-card {
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-lg);
+  padding: 16px 12px 10px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 12px;
+}
+
+.income-chart,
+.income-axis {
+  display: grid;
+  gap: 3px;
+}
+.income-chart.is-week,
+.income-axis.is-week { gap: 8px; }
+
+.income-chart {
+  height: 170px;
+  align-items: end;
+  border-bottom: 1px solid var(--accent-pink-border);
+}
+
+.income-bar {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.income-bar-fill {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--powder-300);
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1), background var(--transition-fast);
+}
+.income-bar.is-empty .income-bar-fill { background: var(--accent-pink-soft); }
+.income-bar.is-today .income-bar-fill { background: var(--powder-400); }
+.income-bar.is-selected .income-bar-fill { background: var(--powder-600); }
+
+.income-axis { margin-top: 6px; }
+.income-axis span {
+  font-size: 10px;
+  color: var(--hint-color);
+  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+}
+.income-axis.is-week span,
+.income-axis.is-year span { font-size: 11px; }
+.income-axis span.is-today { color: var(--powder-600); font-weight: 700; }
+
+.income-chart-hint {
+  font-size: 11px;
+  color: var(--hint-color);
+  text-align: center;
+  margin-top: 8px;
+}
+
+.income-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.income-stat {
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  text-align: center;
+  box-shadow: var(--card-shadow);
+}
+.income-stat-value { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.income-stat-label { font-size: 12px; color: var(--hint-color); margin-top: 2px; }
+
+.income-note {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Цена на карточке записи */
+.appt-card-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--powder-600);
+  white-space: nowrap;
+}
+:root.dark-theme .appt-card-price { color: var(--powder-300); }
+
+/* Пять иконок в шапке на узких экранах */
+@media (max-width: 400px) {
+  .header-actions { gap: 2px; }
+  .header-actions .icon-btn { width: 36px; height: 36px; }
+}

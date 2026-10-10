@@ -113,6 +113,13 @@ const RU_MONTHS_NOM = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
 ];
 const RU_WEEKDAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+// Подпись валюты у сумм. Поменяй под себя ('лей', '₽', '$') или оставь '' — тогда только число.
+const CURRENCY = 'руб.';
+function formatMoney(n) {
+  const num = new Intl.NumberFormat('ru-RU').format(Math.round(Number(n) || 0));
+  return CURRENCY ? `${num}\u00A0${CURRENCY}` : num;
+}
 const RU_WEEKDAYS_FULL = [
   'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'
 ];
@@ -268,6 +275,9 @@ function goScreen(name) {
       tg?.MainButton?.hide();
     } else if (name === 'clients') {
       if (headerTitle) headerTitle.textContent = 'Клиенты';
+      tg?.MainButton?.hide();
+    } else if (name === 'income') {
+      if (headerTitle) headerTitle.textContent = 'Доходы';
       tg?.MainButton?.hide();
     }
   }
@@ -546,6 +556,7 @@ function renderAppointmentsList() {
     card.innerHTML = `
       <div class="appt-card-top">
         <span class="appt-card-time">🕐 ${formatApptTime(a)}</span>
+        ${a.price != null ? `<span class="appt-card-price">${formatMoney(a.price)}</span>` : ''}
       </div>
       <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
       ${whoHtml}
@@ -583,6 +594,7 @@ function openForm(appt = null) {
   const clientInput = document.getElementById('form-appt-client');
   const whoInput = document.getElementById('form-appt-who');
   const commentInput = document.getElementById('form-appt-comment');
+  const priceInput = document.getElementById('form-appt-price');
   const deleteBtn = document.getElementById('btn-delete-appt');
   const quickTomorrowBtn = document.getElementById('btn-quick-tomorrow');
   const conflictAlert = document.getElementById('conflict-alert');
@@ -597,6 +609,7 @@ function openForm(appt = null) {
     if (clientInput) clientInput.value = appt.client_name;
     if (whoInput) whoInput.value = appt.who || '';
     if (commentInput) commentInput.value = appt.comment || '';
+    if (priceInput) priceInput.value = appt.price ?? '';
     selectedService = appt.service || 'manicure';
     manicureCoating = appt.manicure_coating || 'gel';
     pedicureCoating = appt.pedicure_coating || 'gel';
@@ -622,6 +635,7 @@ function openForm(appt = null) {
     if (clientInput) clientInput.value = appt?.client_name || '';
     if (whoInput) whoInput.value = '';
     if (commentInput) commentInput.value = '';
+    if (priceInput) priceInput.value = '';
     selectedService = 'manicure';
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
@@ -776,6 +790,16 @@ async function saveAppointment() {
   if (!start_time) return showToast('Укажите время приема');
   if (!client_name) return showToast('Укажите имя клиента');
 
+  const priceEl = document.getElementById('form-appt-price');
+  // Браузер стирает value у нечислового ввода («1e», «--»): ловим это, чтобы не сохранить запись молча без цены
+  if (priceEl?.validity?.badInput) return showToast('Цена — целое число, например 800');
+  const priceRaw = priceEl?.value?.trim() ?? '';
+  let price = null;
+  if (priceRaw !== '') {
+    price = Number(priceRaw);
+    if (!Number.isInteger(price) || price < 0) return showToast('Цена — целое число, например 800');
+  }
+
   const payload = {
     date,
     start_time,
@@ -785,6 +809,7 @@ async function saveAppointment() {
     manicure_coating: (selectedService === 'manicure' || selectedService === 'both') ? manicureCoating : null,
     pedicure_coating: (selectedService === 'pedicure' || selectedService === 'both') ? pedicureCoating : null,
     comment,
+    price,
   };
 
   try {
@@ -1606,6 +1631,199 @@ document.getElementById('input-clients-search')?.addEventListener('input', (e) =
     loadClients(q);
   }, 250);
 });
+
+// ===== ДОХОДЫ =====
+const RU_MONTHS_SHORT = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+
+const income = {
+  period: 'week',      // week | month | year
+  anchor: todayStr,    // любая дата внутри показываемого периода
+  data: null,          // ответ GET /api/stats
+  selectedKey: null,   // выбранный столбик диаграммы
+  requestId: 0,        // защита от «устаревших» ответов при быстром переключении
+};
+
+function incomePeriodLabel(d) {
+  const from = parseDate(d.from);
+  const to = parseDate(d.to);
+  if (d.period === 'year') return String(from.getFullYear());
+  if (d.period === 'month') return `${RU_MONTHS_NOM[from.getMonth()]} ${from.getFullYear()}`;
+  if (from.getMonth() === to.getMonth()) {
+    return `${from.getDate()}–${to.getDate()} ${RU_MONTHS[to.getMonth()]} ${to.getFullYear()}`;
+  }
+  return `${from.getDate()} ${RU_MONTHS[from.getMonth()]} – ${to.getDate()} ${RU_MONTHS[to.getMonth()]} ${to.getFullYear()}`;
+}
+
+function incomeBucketTitle(period, bucket) {
+  const d = parseDate(bucket.from);
+  if (period === 'year') return `${RU_MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`;
+  return `${RU_WEEKDAYS_SHORT[(d.getDay() + 6) % 7]}, ${d.getDate()} ${RU_MONTHS[d.getMonth()]}`;
+}
+
+function incomeAxisLabel(period, index, total) {
+  if (period === 'week') return RU_WEEKDAYS_SHORT[index];
+  if (period === 'year') return RU_MONTHS_SHORT[index];
+  const day = index + 1; // месяц: подписываем 1, 5, 10, … и последний день, если не вплотную к кратному 5
+  if (day === 1 || day % 5 === 0) return String(day);
+  return day === total && total % 5 >= 3 ? String(day) : '';
+}
+
+function unpricedPhrase(n) {
+  const word = n % 10 === 1 && n % 100 !== 11 ? 'записи' : 'записей';
+  return `У ${n} ${word} не указана цена — они не входят в доходы.`;
+}
+
+function renderIncomeSummary() {
+  const d = income.data;
+  if (!d) return;
+  const selected = income.selectedKey ? d.buckets.find((b) => b.key === income.selectedKey) : null;
+
+  document.getElementById('income-period-label').textContent = incomePeriodLabel(d);
+  document.getElementById('income-focus-label').textContent = selected
+    ? incomeBucketTitle(d.period, selected)
+    : { week: 'Доход за неделю', month: 'Доход за месяц', year: 'Доход за год' }[d.period];
+  document.getElementById('income-total-value').textContent = formatMoney(selected ? selected.sum : d.total);
+
+  const deltaEl = document.getElementById('income-delta');
+  deltaEl.className = 'income-delta';
+  if (selected) {
+    deltaEl.textContent = selected.paid ? `Записей с ценой: ${selected.paid}` : 'Нет записей с ценой';
+  } else if (d.prev_total > 0) {
+    const pct = Math.round(((d.total - d.prev_total) / d.prev_total) * 100);
+    const prevWord = { week: 'прошлой неделе', month: 'прошлому месяцу', year: 'прошлому году' }[d.period];
+    if (pct > 0) { deltaEl.classList.add('up'); deltaEl.textContent = `▲ ${pct}% к ${prevWord}`; }
+    else if (pct < 0) { deltaEl.classList.add('down'); deltaEl.textContent = `▼ ${Math.abs(pct)}% к ${prevWord}`; }
+    else deltaEl.textContent = `Без изменений к ${prevWord}`;
+  } else {
+    deltaEl.textContent = '';
+  }
+
+  document.getElementById('income-stat-count').textContent = String(d.paid);
+  document.getElementById('income-stat-avg').textContent = d.paid ? formatMoney(d.avg) : '—';
+
+  const noteEl = document.getElementById('income-note');
+  if (d.unpaid > 0) {
+    noteEl.textContent = unpricedPhrase(d.unpaid);
+    noteEl.style.display = 'block';
+  } else if (d.paid === 0) {
+    noteEl.textContent = 'Укажи цену в записях — и здесь появятся доходы.';
+    noteEl.style.display = 'block';
+  } else {
+    noteEl.style.display = 'none';
+  }
+}
+
+function renderIncomeChart() {
+  const d = income.data;
+  const chart = document.getElementById('income-chart');
+  const axis = document.getElementById('income-axis');
+  if (!d || !chart || !axis) return;
+
+  const cols = `repeat(${d.buckets.length}, minmax(0, 1fr))`;
+  chart.className = `income-chart is-${d.period}`;
+  axis.className = `income-axis is-${d.period}`;
+  chart.style.gridTemplateColumns = cols;
+  axis.style.gridTemplateColumns = cols;
+  chart.innerHTML = '';
+  axis.innerHTML = '';
+
+  const max = Math.max(0, ...d.buckets.map((b) => b.sum));
+  const nowKey = d.period === 'year' ? todayStr.slice(0, 7) : todayStr;
+  const fills = [];
+
+  d.buckets.forEach((b, i) => {
+    const pct = max > 0 && b.sum > 0 ? Math.max(3, Math.round((b.sum / max) * 100)) : 0;
+    const bar = document.createElement('button');
+    bar.type = 'button';
+    bar.className = 'income-bar';
+    bar.dataset.key = b.key;
+    if (b.sum === 0) bar.classList.add('is-empty');
+    if (b.key === nowKey) bar.classList.add('is-today');
+    if (b.key === income.selectedKey) bar.classList.add('is-selected');
+    bar.setAttribute('aria-label', `${incomeBucketTitle(d.period, b)}: ${formatMoney(b.sum)}`);
+
+    const fill = document.createElement('div');
+    fill.className = 'income-bar-fill';
+    fill.style.height = '0%';
+    fill.dataset.target = `${pct}%`;
+    bar.appendChild(fill);
+    fills.push(fill);
+
+    bar.addEventListener('click', () => {
+      haptic('light');
+      income.selectedKey = income.selectedKey === b.key ? null : b.key;
+      chart.querySelectorAll('.income-bar').forEach((el) => {
+        el.classList.toggle('is-selected', el.dataset.key === income.selectedKey);
+      });
+      renderIncomeSummary();
+    });
+    chart.appendChild(bar);
+
+    const label = document.createElement('span');
+    label.textContent = incomeAxisLabel(d.period, i, d.buckets.length);
+    if (b.key === nowKey) label.classList.add('is-today');
+    axis.appendChild(label);
+  });
+
+  // Плавное «вырастание» столбиков
+  const grow = () => fills.forEach((f) => { f.style.height = f.dataset.target; });
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(grow));
+  else grow();
+}
+
+function renderIncome() {
+  renderIncomeChart();
+  renderIncomeSummary();
+}
+
+async function loadIncome() {
+  const reqId = ++income.requestId;
+  try {
+    const data = await api(`/stats?period=${income.period}&date=${income.anchor}`);
+    if (reqId !== income.requestId) return; // пока грузилось, пользователь переключил период
+    income.data = data;
+    income.selectedKey = null;
+    renderIncome();
+  } catch (err) {
+    console.error('Ошибка загрузки доходов:', err);
+  }
+}
+
+function shiftIncomeAnchor(dir) {
+  if (income.period === 'week') {
+    income.anchor = addDays(income.anchor, 7 * dir);
+    return;
+  }
+  const d = parseDate(income.anchor);
+  d.setDate(1);
+  if (income.period === 'month') d.setMonth(d.getMonth() + dir);
+  else d.setFullYear(d.getFullYear() + dir);
+  income.anchor = fmt(d);
+}
+
+document.getElementById('btn-open-income')?.addEventListener('click', () => {
+  haptic('light');
+  income.anchor = todayStr;
+  goScreen('income');
+  loadIncome();
+});
+document.getElementById('btn-back-from-income')?.addEventListener('click', () => {
+  haptic('light');
+  goScreen('main');
+});
+document.querySelectorAll('#income-period-selector .segment-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    haptic('light');
+    if (btn.dataset.period === income.period) income.anchor = todayStr; // повторное нажатие — к текущему периоду
+    income.period = btn.dataset.period;
+    document.querySelectorAll('#income-period-selector .segment-btn').forEach((b) => {
+      b.classList.toggle('active', b === btn);
+    });
+    loadIncome();
+  });
+});
+document.getElementById('btn-income-prev')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(-1); loadIncome(); });
+document.getElementById('btn-income-next')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(1); loadIncome(); });
 
 // События кнопок модуля клиентов
 document.getElementById('btn-open-clients')?.addEventListener('click', () => {

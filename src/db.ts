@@ -1,5 +1,6 @@
 // Все запросы к D1. ВАЖНО: каждый запрос фильтруется по user_id.
 import type { Appointment, Client, UserRow } from './types';
+import type { DayRow } from './lib/stats';
 
 export type AppointmentInput = Omit<Appointment, 'id' | 'user_id'>;
 export type ClientInput = { name: string; phone?: string | null; telegram?: string | null; notes?: string | null; birthday?: string | null };
@@ -72,7 +73,7 @@ export async function insertAppointment(
   const res = await db
     .prepare(
       `INSERT INTO appointments (user_id, date, start_time, end_time, client_name, who, service,
-         manicure_coating, pedicure_coating, comment) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+         manicure_coating, pedicure_coating, comment, price) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .bind(
       userId,
@@ -85,6 +86,7 @@ export async function insertAppointment(
       data.manicure_coating,
       data.pedicure_coating,
       data.comment,
+      data.price ?? null,
     )
     .run();
   return res.meta.last_row_id as number;
@@ -99,7 +101,7 @@ export async function updateAppointment(
   const res = await db
     .prepare(
       `UPDATE appointments SET date=?, start_time=?, end_time=?, client_name=?, who=?, service=?,
-         manicure_coating=?, pedicure_coating=?, comment=?, updated_at=datetime('now')
+         manicure_coating=?, pedicure_coating=?, comment=?, price=?, updated_at=datetime('now')
        WHERE user_id=? AND id=?`,
     )
     .bind(
@@ -112,11 +114,26 @@ export async function updateAppointment(
       data.manicure_coating,
       data.pedicure_coating,
       data.comment,
+      data.price ?? null,
       userId,
       id,
     )
     .run();
   return (res.meta.changes ?? 0) > 0;
+}
+
+/** Доходы по дням за период: сумма цен, число записей с ценой и без неё. */
+export async function getIncomeByDay(db: D1Database, userId: number, from: string, to: string): Promise<DayRow[]> {
+  const r = await db
+    .prepare(
+      `SELECT date, COALESCE(SUM(price), 0) AS sum, COUNT(price) AS paid, COUNT(*) - COUNT(price) AS unpaid
+       FROM appointments
+       WHERE user_id = ? AND date >= ? AND date <= ?
+       GROUP BY date`,
+    )
+    .bind(userId, from, to)
+    .all<DayRow>();
+  return r.results;
 }
 
 export async function deleteAppointment(db: D1Database, userId: number, id: number): Promise<boolean> {

@@ -27,6 +27,7 @@ export interface Appointment {
   manicure_coating: Coating | null;
   pedicure_coating: Coating | null;
   comment: string | null;
+  price: number | null; // цена в валюте мастера, целое число; null — не указана
 }
 
 export interface UserRow {
