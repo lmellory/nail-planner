@@ -5,9 +5,9 @@ import { weekdayRu } from './time';
 
 const coat = (c: string | null) => (c === 'gel' ? 'с покрытием' : 'без покрытия');
 
-/** Время записи для показа: «18:00», а у старых записей с концом «18:00–20:00». */
-export function timeLabel(a: Pick<Appointment, 'start_time' | 'end_time'>): string {
-  return a.end_time ? `${a.start_time}–${a.end_time}` : a.start_time;
+/** Время записи для показа: только начало, например «18:00» (конец нужен лишь для расчётов). */
+export function timeLabel(a: Pick<Appointment, 'start_time'> & { end_time?: string | null }): string {
+  return a.start_time;
 }
 
 export function serviceLabel(a: Appointment): string {

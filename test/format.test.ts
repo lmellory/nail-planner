@@ -7,8 +7,8 @@ describe('timeLabel', () => {
     expect(timeLabel({ start_time: '18:00', end_time: null })).toBe('18:00');
   });
 
-  it('возвращает диапазон start_time–end_time для старых записей', () => {
-    expect(timeLabel({ start_time: '18:00', end_time: '20:00' })).toBe('18:00–20:00');
+  it('показывает только время начала, даже если конец сохранён', () => {
+    expect(timeLabel({ start_time: '18:00', end_time: '20:00' })).toBe('18:00');
   });
 });
 

@@ -83,7 +83,7 @@ function addMinutes(timeStr, minutes) {
 
 function formatApptTime(a) {
   if (!a) return '';
-  return a.end_time ? `${a.start_time}–${a.end_time}` : a.start_time;
+  return a.start_time;
 }
 
 function parseDate(s) {
