@@ -166,22 +166,10 @@
             <input type="date" id="form-appt-date" class="form-input" required>
           </div>
 
-          <!-- Время приема и авто-длительность -->
+          <!-- Время приема -->
           <div class="form-group">
             <label for="form-appt-start">Время приема *</label>
             <input type="time" id="form-appt-start" class="form-input time-single-input" required>
-            <div class="duration-row">
-              <span class="duration-caption">⏱ Длительность:</span>
-              <div class="duration-pills" id="duration-pills">
-                <button type="button" class="duration-pill" data-mins="60">1 ч</button>
-                <button type="button" class="duration-pill" data-mins="90">1.5 ч</button>
-                <button type="button" class="duration-pill active" data-mins="120">2 ч</button>
-                <button type="button" class="duration-pill" data-mins="150">2.5 ч</button>
-                <button type="button" class="duration-pill" data-mins="180">3 ч</button>
-                <button type="button" class="duration-pill" data-mins="210">3.5 ч</button>
-              </div>
-            </div>
-            <input type="hidden" id="form-appt-duration" value="120">
           </div>
 
           <!-- Имя клиента с автоподстановкой из базы клиентов -->

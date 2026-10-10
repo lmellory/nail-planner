@@ -81,14 +81,6 @@ function addMinutes(timeStr, minutes) {
   return minutesToTime(total);
 }
 
-function defaultDurationForService(service) {
-  if (service === 'manicure') return 120;
-  if (service === 'pedicure') return 90;
-  if (service === 'both') return 210;
-  if (service === 'fingers') return 60;
-  return 120;
-}
-
 function formatApptTime(a) {
   if (!a) return '';
   return a.end_time ? `${a.start_time}–${a.end_time}` : a.start_time;
@@ -499,7 +491,7 @@ async function loadFreeSlots(dateStr) {
       btn.textContent = `✨ ${slot.start}–${slot.end} (${durText})`;
       btn.addEventListener('click', () => {
         haptic('light');
-        openForm({ date: dateStr, start_time: slot.start, duration: 120 });
+        openForm({ date: dateStr, start_time: slot.start });
       });
       chipsEl.appendChild(btn);
     }
@@ -580,15 +572,6 @@ function escapeHtml(s) {
 let selectedService = 'manicure';
 let manicureCoating = 'gel';
 let pedicureCoating = 'gel';
-let selectedDuration = 120;
-
-function updateDurationPillsUI() {
-  document.querySelectorAll('#duration-pills .duration-pill').forEach((pill) => {
-    pill.classList.toggle('active', Number(pill.dataset.mins) === selectedDuration);
-  });
-  const durInput = document.getElementById('form-appt-duration');
-  if (durInput) durInput.value = selectedDuration;
-}
 
 function openForm(appt = null) {
   state.editingAppointmentId = appt && appt.id ? appt.id : null;
@@ -617,11 +600,6 @@ function openForm(appt = null) {
     selectedService = appt.service || 'manicure';
     manicureCoating = appt.manicure_coating || 'gel';
     pedicureCoating = appt.pedicure_coating || 'gel';
-    if (appt.end_time && appt.start_time) {
-      selectedDuration = Math.max(30, timeToMinutes(appt.end_time) - timeToMinutes(appt.start_time));
-    } else {
-      selectedDuration = defaultDurationForService(selectedService);
-    }
     if (deleteBtn) deleteBtn.style.display = 'block';
     if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'block';
   } else {
@@ -647,13 +625,11 @@ function openForm(appt = null) {
     selectedService = 'manicure';
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
-    selectedDuration = appt?.duration || defaultDurationForService(selectedService);
     if (deleteBtn) deleteBtn.style.display = 'none';
     if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'none';
   }
 
   updateServiceAndCoatingUI();
-  updateDurationPillsUI();
   updateClientMatchBadge();
   goScreen('form');
   checkConflicts();
@@ -683,16 +659,6 @@ function updateClientMatchBadge() {
 }
 
 document.getElementById('form-appt-client')?.addEventListener('input', updateClientMatchBadge);
-
-// Переключение чипов длительности
-document.querySelectorAll('#duration-pills .duration-pill').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    haptic('light');
-    selectedDuration = Number(btn.dataset.mins);
-    updateDurationPillsUI();
-    checkConflicts();
-  });
-});
 
 function updateServiceAndCoatingUI() {
   // Селектор услуги
@@ -733,9 +699,7 @@ document.querySelectorAll('#service-selector .segment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     haptic('light');
     selectedService = btn.dataset.service;
-    selectedDuration = defaultDurationForService(selectedService);
     updateServiceAndCoatingUI();
-    updateDurationPillsUI();
     checkConflicts();
   });
 });
@@ -772,15 +736,12 @@ async function checkConflicts() {
       return;
     }
 
-    const calculatedEnd = addMinutes(start, selectedDuration);
-
     try {
       const res = await api('/appointments/check', {
         method: 'POST',
         body: JSON.stringify({
           date,
           start_time: start,
-          end_time: calculatedEnd,
           service: selectedService,
           exclude_id: excludeId,
         }),
@@ -815,12 +776,9 @@ async function saveAppointment() {
   if (!start_time) return showToast('Укажите время приема');
   if (!client_name) return showToast('Укажите имя клиента');
 
-  const end_time = addMinutes(start_time, selectedDuration);
-
   const payload = {
     date,
     start_time,
-    end_time,
     client_name,
     who,
     service: selectedService,

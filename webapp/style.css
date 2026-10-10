@@ -1155,46 +1155,6 @@ body {
   transform: scale(0.96);
 }
 
-/* --------------------------------------------------------------------------
-   Селектор длительности в форме
-   -------------------------------------------------------------------------- */
-.duration-row {
-  margin-top: 8px;
-}
-
-.duration-caption {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--hint-color);
-  margin-bottom: 6px;
-  text-transform: uppercase;
-}
-
-.duration-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.duration-pill {
-  background: var(--powder-100);
-  border: 1px solid var(--accent-pink-border);
-  color: var(--text-color);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.duration-pill.active {
-  background: var(--powder-500);
-  border-color: var(--powder-600);
-  color: #ffffff;
-}
-
 .client-match-badge {
   background: var(--powder-50);
   border: 1px solid var(--powder-300);
