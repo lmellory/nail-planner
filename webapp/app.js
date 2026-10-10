@@ -85,6 +85,7 @@ function defaultDurationForService(service) {
   if (service === 'manicure') return 120;
   if (service === 'pedicure') return 90;
   if (service === 'both') return 210;
+  if (service === 'fingers') return 60;
   return 120;
 }
 
@@ -534,6 +535,7 @@ function renderAppointmentsList() {
     let serviceRu = 'Маникюр';
     if (a.service === 'pedicure') serviceRu = 'Педикюр';
     else if (a.service === 'both') serviceRu = 'Маникюр + Педикюр';
+    else if (a.service === 'fingers') serviceRu = 'Пальцы';
 
     let coatingRu = '';
     const coatTxt = (c) => (c === 'gel' ? 'с покрытием' : 'без покрытия');
@@ -710,6 +712,10 @@ function updateServiceAndCoatingUI() {
   } else if (selectedService === 'both') {
     if (manGroup) manGroup.style.display = 'block';
     if (pedGroup) pedGroup.style.display = 'block';
+  } else if (selectedService === 'fingers') {
+    // «Пальцы» — без выбора покрытия
+    if (manGroup) manGroup.style.display = 'none';
+    if (pedGroup) pedGroup.style.display = 'none';
   }
 
   // Чипы покрытия маникюра
@@ -818,8 +824,8 @@ async function saveAppointment() {
     client_name,
     who,
     service: selectedService,
-    manicure_coating: selectedService === 'pedicure' ? null : manicureCoating,
-    pedicure_coating: selectedService === 'manicure' ? null : pedicureCoating,
+    manicure_coating: (selectedService === 'manicure' || selectedService === 'both') ? manicureCoating : null,
+    pedicure_coating: (selectedService === 'pedicure' || selectedService === 'both') ? pedicureCoating : null,
     comment,
   };
 
@@ -1100,6 +1106,7 @@ function renderSearchResults(items) {
     let serviceRu = 'Маникюр';
     if (a.service === 'pedicure') serviceRu = 'Педикюр';
     else if (a.service === 'both') serviceRu = 'Маникюр + Педикюр';
+    else if (a.service === 'fingers') serviceRu = 'Пальцы';
 
     const whoHtml = a.who ? `<span class="appt-card-who">${escapeHtml(a.who)}</span>` : '';
 

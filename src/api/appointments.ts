@@ -1,6 +1,6 @@
 // CRUD записей + проверка пересечений (предупреждение, без запрета).
 import { Hono } from 'hono';
-import type { AppVars, Env } from '../types';
+import type { AppVars, Env, Service } from '../types';
 import {
   NEW_APPT_MSG_TTL_SEC,
   deleteAppointment,
@@ -19,7 +19,7 @@ import { serviceLabel, timeLabel } from '../lib/format';
 
 export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
-const SERVICES = ['manicure', 'pedicure', 'both'];
+const SERVICES = ['manicure', 'pedicure', 'both', 'fingers'];
 const COATINGS = ['gel', 'none'];
 
 /** Проверка и нормализация тела запроса. Возвращает [данные, ошибка]. */
@@ -49,7 +49,7 @@ export function validate(b: any) {
     end_time: endTime,
     client_name: name.slice(0, 100),
     who: b.who ? String(b.who).slice(0, 200) : null,
-    service: b.service as 'manicure' | 'pedicure' | 'both',
+    service: b.service as Service,
     manicure_coating: mc as 'gel' | 'none' | null,
     pedicure_coating: pc as 'gel' | 'none' | null,
     comment: b.comment ? String(b.comment).slice(0, 1000) : null,

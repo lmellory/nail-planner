@@ -57,6 +57,7 @@ export function defaultServiceDuration(service: string): number {
   if (service === 'manicure') return 120; // 2 ч
   if (service === 'pedicure') return 90;  // 1.5 ч
   if (service === 'both') return 210;     // 3.5 ч
+  if (service === 'fingers') return 60;   // 1 ч
   return 120;
 }
 

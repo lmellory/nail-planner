@@ -27,6 +27,7 @@ function serviceLabelRu(service: string): string {
   if (service === 'manicure') return 'маникюр';
   if (service === 'pedicure') return 'педикюр';
   if (service === 'both') return 'маникюр + педикюр';
+  if (service === 'fingers') return 'пальцы';
   return service;
 }
 

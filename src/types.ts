@@ -12,7 +12,7 @@ export interface Env {
   TURSO_AUTH_TOKEN?: string;
 }
 
-export type Service = 'manicure' | 'pedicure' | 'both';
+export type Service = 'manicure' | 'pedicure' | 'both' | 'fingers';
 export type Coating = 'gel' | 'none';
 
 export interface Appointment {
