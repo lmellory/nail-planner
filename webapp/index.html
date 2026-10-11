@@ -384,7 +384,46 @@
             </div>
           </div>
 
+          <!-- Блок резервной копии -->
+          <div class="settings-card-title" style="margin-top: 18px;">💾 Резервная копия</div>
+          <div class="setting-toggle-row">
+            <div>
+              <label for="setting-backup-enabled" class="toggle-label">Присылать копию раз в неделю</label>
+              <small class="form-hint">По воскресеньям в 21:00 бот присылает файл со всеми записями, клиентами, тратами и прайсом. Первая копия придёт сразу после включения.</small>
+            </div>
+            <input type="checkbox" id="setting-backup-enabled" class="toggle-checkbox">
+          </div>
+
           <button type="button" class="btn-primary" id="btn-save-settings">Сохранить настройки</button>
+        </div>
+
+        <!-- Блок прайса услуг -->
+        <div class="settings-card">
+          <div class="settings-card-title">💰 Прайс услуг</div>
+          <p class="settings-card-desc">Эта цена сама подставляется в новую запись — её можно изменить для конкретного клиента. Пустое поле — цена не подставляется.</p>
+
+          <div class="time-range-row">
+            <div class="form-group" style="flex: 1;">
+              <label for="setting-price-manicure">Маникюр</label>
+              <input type="number" id="setting-price-manicure" class="form-input" inputmode="numeric" min="0" max="10000000" step="1" placeholder="—">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="setting-price-pedicure">Педикюр</label>
+              <input type="number" id="setting-price-pedicure" class="form-input" inputmode="numeric" min="0" max="10000000" step="1" placeholder="—">
+            </div>
+          </div>
+          <div class="time-range-row">
+            <div class="form-group" style="flex: 1;">
+              <label for="setting-price-both">Маникюр + педикюр</label>
+              <input type="number" id="setting-price-both" class="form-input" inputmode="numeric" min="0" max="10000000" step="1" placeholder="—">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="setting-price-fingers">Пальцы</label>
+              <input type="number" id="setting-price-fingers" class="form-input" inputmode="numeric" min="0" max="10000000" step="1" placeholder="—">
+            </div>
+          </div>
+
+          <button type="button" class="btn-primary" id="btn-save-prices">Сохранить прайс</button>
         </div>
 
         <!-- Блок выгрузки в Excel -->
@@ -398,6 +437,13 @@
               <div class="export-btn-text">
                 <strong>Выгрузить в Excel (CSV)</strong>
                 <small>Все записи с датами, временем, клиентами и услугами</small>
+              </div>
+            </button>
+            <button type="button" class="btn-export" id="btn-export-json">
+              <span class="export-btn-icon">💾</span>
+              <div class="export-btn-text">
+                <strong>Резервная копия сейчас (JSON)</strong>
+                <small>Записи, клиенты, траты, прайс и настройки одним файлом</small>
               </div>
             </button>
           </div>
@@ -485,6 +531,7 @@
         <div class="income-actions">
           <button type="button" class="btn btn-primary" id="btn-add-expense">+ Добавить трату</button>
           <button type="button" class="btn btn-secondary" id="btn-open-expenses">Все траты за период</button>
+          <button type="button" class="btn btn-secondary" id="btn-export-finance">📊 Выгрузить доходы и траты (CSV)</button>
         </div>
       </div>
     </section>

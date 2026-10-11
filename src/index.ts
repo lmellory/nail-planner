@@ -10,9 +10,10 @@ import { search } from './api/search';
 import { settings } from './api/settings';
 import { stats } from './api/stats';
 import { expenses } from './api/expenses';
+import { prices } from './api/prices';
 import { exporter } from './api/export';
 import { webhook } from './bot/webhook';
-import { runNotifications } from './cron';
+import { runNotifications, runWeeklyBackups } from './cron';
 import { createTursoD1 } from './lib/turso';
 
 const app = new Hono<{ Bindings: Env; Variables: AppVars }>();
@@ -46,6 +47,7 @@ app.route('/api/search', search);
 app.route('/api/settings', settings);
 app.route('/api/stats', stats);
 app.route('/api/expenses', expenses);
+app.route('/api/prices', prices);
 app.route('/api/export', exporter);
 
 app.onError((err, c) => {
@@ -68,6 +70,11 @@ export default {
       await runNotifications(env, appUrl);
     } catch (err) {
       console.error('Scheduled notification error:', err);
+    }
+    try {
+      await runWeeklyBackups(env);
+    } catch (err) {
+      console.error('Scheduled backup error:', err);
     }
   },
 };

@@ -196,6 +196,7 @@ export async function updateUserSettings(
     work_start_time?: string;
     work_end_time?: string;
     work_days?: string;
+    backup_enabled?: boolean | number;
   },
 ): Promise<UserRow> {
   const current = (await getUser(db, userId))!;
@@ -209,15 +210,16 @@ export async function updateUserSettings(
   const workStart = settings.work_start_time ?? current.work_start_time ?? '09:00';
   const workEnd = settings.work_end_time ?? current.work_end_time ?? '20:00';
   const workDays = settings.work_days ?? current.work_days ?? '1,2,3,4,5,6';
+  const backupEnabled = flag(settings.backup_enabled, current.backup_enabled ?? 1);
 
   await db
     .prepare(
       `UPDATE users
        SET notify_enabled=?, notify_time=?, tz=?, notify_new_appt=?,
-           work_start_time=?, work_end_time=?, work_days=?
+           work_start_time=?, work_end_time=?, work_days=?, backup_enabled=?
        WHERE user_id=?`,
     )
-    .bind(notifyEnabled, notifyTime, tz, notifyNewAppt, workStart, workEnd, workDays, userId)
+    .bind(notifyEnabled, notifyTime, tz, notifyNewAppt, workStart, workEnd, workDays, backupEnabled, userId)
     .run();
   return (await db.prepare('SELECT * FROM users WHERE user_id = ?').bind(userId).first<UserRow>())!;
 }
@@ -410,14 +412,20 @@ export async function getAllDayNotes(db: D1Database, userId: number): Promise<{ 
 
 // ===== Траты на материалы =====
 
-export async function listExpenses(db: D1Database, userId: number, from: string, to: string): Promise<Expense[]> {
+export async function listExpenses(
+  db: D1Database,
+  userId: number,
+  from: string,
+  to: string,
+  limit = 1000,
+): Promise<Expense[]> {
   const r = await db
     .prepare(
       `SELECT id, user_id, date, name, amount FROM expenses
        WHERE user_id = ? AND date >= ? AND date <= ?
-       ORDER BY date DESC, id DESC LIMIT 1000`,
+       ORDER BY date DESC, id DESC LIMIT ?`,
     )
-    .bind(userId, from, to)
+    .bind(userId, from, to, limit)
     .all<Expense>();
   return r.results;
 }
@@ -492,5 +500,37 @@ export async function getAllExpenses(db: D1Database, userId: number): Promise<Ex
     .prepare('SELECT id, user_id, date, name, amount FROM expenses WHERE user_id = ? ORDER BY date, id')
     .bind(userId)
     .all<Expense>();
+  return r.results;
+}
+
+// ===== Прайс услуг и полная выгрузка клиентов =====
+
+/** Цены услуг мастера: { manicure: 800, ... } (только заданные). */
+export async function getServicePrices(db: D1Database, userId: number): Promise<Record<string, number>> {
+  const r = await db
+    .prepare('SELECT service, price FROM service_prices WHERE user_id = ?')
+    .bind(userId)
+    .all<{ service: string; price: number }>();
+  return Object.fromEntries(r.results.map((x) => [x.service, Number(x.price)]));
+}
+
+/** Задаёт цену услуги; null — убирает цену. */
+export async function setServicePrice(db: D1Database, userId: number, service: string, price: number | null): Promise<void> {
+  if (price === null) {
+    await db.prepare('DELETE FROM service_prices WHERE user_id = ? AND service = ?').bind(userId, service).run();
+    return;
+  }
+  await db
+    .prepare(
+      `INSERT INTO service_prices (user_id, service, price) VALUES (?,?,?)
+       ON CONFLICT(user_id, service) DO UPDATE SET price = excluded.price`,
+    )
+    .bind(userId, service, price)
+    .run();
+}
+
+/** Все клиенты «как есть» (для резервной копии), без подсчёта визитов. */
+export async function getAllClients(db: D1Database, userId: number): Promise<Client[]> {
+  const r = await db.prepare('SELECT * FROM clients WHERE user_id = ? ORDER BY id').bind(userId).all<Client>();
   return r.results;
 }

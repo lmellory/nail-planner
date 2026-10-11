@@ -16,11 +16,11 @@ import {
 import { addMinutes, defaultServiceDuration, isDate, isTime } from '../lib/time';
 import { escapeHtml, sendMessage } from '../bot/telegram';
 import { parseAmount } from '../lib/money';
+import { SERVICES } from '../lib/services';
 import { serviceLabel, timeLabel } from '../lib/format';
 
 export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
-const SERVICES = ['manicure', 'pedicure', 'both', 'fingers'];
 const COATINGS = ['gel', 'none'];
 
 /** Проверка и нормализация тела запроса. Возвращает [данные, ошибка]. */

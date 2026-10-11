@@ -1,9 +1,13 @@
 // Экспорт данных пользователя: CSV (UTF-8 с BOM, разделитель «;»), JSON и отправка в чат ботом
 import { Hono, type Context } from 'hono';
-import type { Appointment, AppVars, Env } from '../types';
-import { ensureUser, getAllAppointments, getAllDayNotes, getAllExpenses } from '../db';
+import type { Appointment, AppVars, Env, Expense } from '../types';
+import { ensureUser, getAllAppointments, listAppointments, listExpenses } from '../db';
+import { buildJsonBackup } from '../lib/backup';
+import { isPeriod, periodRange } from '../lib/stats';
 import { sendDocument } from '../bot/telegram';
-import { nowInTz } from '../lib/time';
+import { isDate, nowInTz } from '../lib/time';
+
+export { buildJsonBackup };
 
 export const exporter = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
@@ -62,20 +66,6 @@ export function buildCsv(items: Appointment[]): string {
     ),
   ];
   return '\uFEFF' + lines.join('\r\n');
-}
-
-export async function buildJsonBackup(db: D1Database, userId: number, fallbackTz: string) {
-  const appointments = await getAllAppointments(db, userId);
-  const day_notes = await getAllDayNotes(db, userId);
-  const expenses = await getAllExpenses(db, userId);
-  const u = await ensureUser(db, userId, fallbackTz);
-  const settings = {
-    notify_enabled: !!u.notify_enabled,
-    notify_time: u.notify_time,
-    tz: u.tz,
-    notify_new_appt: !!u.notify_new_appt,
-  };
-  return JSON.stringify({ appointments, expenses, day_notes, settings }, null, 2);
 }
 
 async function handleCsv(c: Context<{ Bindings: Env; Variables: AppVars }>) {
@@ -153,4 +143,76 @@ exporter.post('/send', async (c) => {
     }
     return c.json({ ok: true, filename });
   }
+});
+
+/** Одна ячейка CSV: числа пишем как есть (иначе отрицательная прибыль получила бы апостроф от защиты csvEscape). */
+const cell = (v: unknown) => (typeof v === 'number' ? String(v) : csvEscape(v));
+
+/**
+ * CSV «Доходы и траты» за период: построчно доходы (записи с ценой) и траты, затем итоги и траты по материалам.
+ * Записи без цены в доход не входят — их количество указано отдельной строкой.
+ */
+export function buildFinanceCsv(appointments: Appointment[], expenses: Expense[]): string {
+  const paid = appointments.filter((a) => a.price !== null && a.price !== undefined);
+  const unpaid = appointments.length - paid.length;
+
+  type Row = { date: string; kind: number; cells: Array<string | number> };
+  const rows: Row[] = [
+    ...paid.map((a) => ({ date: a.date, kind: 0, cells: ['доход', a.date, a.client_name, serviceLabelRu(a.service), a.price as number] })),
+    ...expenses.map((e) => ({ date: e.date, kind: 1, cells: ['трата', e.date, e.name, 'материалы', e.amount] })),
+  ].sort((x, y) => (x.date === y.date ? x.kind - y.kind : x.date < y.date ? -1 : 1));
+
+  const totalIncome = paid.reduce((s, a) => s + (a.price as number), 0);
+  const totalExpense = expenses.reduce((s, e) => s + e.amount, 0);
+
+  const byName = new Map<string, { sum: number; count: number }>();
+  for (const e of expenses) {
+    const m = byName.get(e.name) ?? { sum: 0, count: 0 };
+    m.sum += e.amount;
+    m.count += 1;
+    byName.set(e.name, m);
+  }
+  const materials = [...byName.entries()].sort((a, b) => b[1].sum - a[1].sum || a[0].localeCompare(b[0], 'ru'));
+
+  const line = (cells: Array<string | number>) => cells.map(cell).join(';');
+  const lines = [
+    line(['тип', 'дата', 'описание', 'категория', 'сумма']),
+    ...rows.map((r) => line(r.cells)),
+    '',
+    line(['итого доход', '', '', '', totalIncome]),
+    line(['итого траты', '', '', '', totalExpense]),
+    line(['прибыль', '', '', '', totalIncome - totalExpense]),
+    ...(unpaid > 0 ? [line(['записей без цены (не учтены)', '', '', '', unpaid])] : []),
+    '',
+    line(['траты по материалам', '', '', 'покупок', 'сумма']),
+    ...materials.map(([name, m]) => line(['материал', '', name, m.count, m.sum])),
+  ];
+  return '\uFEFF' + lines.join('\r\n');
+}
+
+// Отправка в чат CSV «Доходы и траты» за период: POST /api/export/finance { period, date? }
+exporter.post('/finance', async (c) => {
+  const userId = c.get('userId');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!isPeriod(body?.period)) return c.json({ error: 'period: week | month | year' }, 400);
+
+  const u = await ensureUser(c.env.DB, userId, c.env.TZ);
+  const date = body.date === undefined ? nowInTz(u.tz).date : body.date;
+  if (!isDate(date)) return c.json({ error: 'Некорректная дата' }, 400);
+
+  const { from, to } = periodRange(body.period, date);
+  const [appointments, expenses] = await Promise.all([
+    listAppointments(c.env.DB, userId, from, to),
+    listExpenses(c.env.DB, userId, from, to, 10000),
+  ]);
+  const filename = `nail-planner-finance-${from}_${to}.csv`;
+  const res = await sendDocument(
+    c.env,
+    userId,
+    new Blob([buildFinanceCsv(appointments, expenses)], { type: 'text/csv; charset=utf-8' }),
+    filename,
+    `📊 Доходы и траты: ${from} — ${to}`,
+  );
+  if (!res.ok) return c.json({ error: 'Не удалось отправить файл в Telegram' }, 500);
+  return c.json({ ok: true, filename });
 });

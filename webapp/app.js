@@ -186,6 +186,7 @@ const state = {
   editingAppointmentId: null,
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(), // 0..11
+  prices: {},                           // прайс: { manicure: 800, pedicure: null, ... }
 };
 
 // ===== Уведомления (Toast) и тактильный отклик =====
@@ -638,7 +639,7 @@ function openForm(appt = null) {
     if (clientInput) clientInput.value = appt?.client_name || '';
     if (whoInput) whoInput.value = '';
     if (commentInput) commentInput.value = '';
-    if (priceInput) priceInput.value = '';
+    if (priceInput) priceInput.value = state.prices.manicure ?? '';
     selectedService = 'manicure';
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
@@ -711,11 +712,23 @@ function updateServiceAndCoatingUI() {
   });
 }
 
+// Подстановка цены из прайса при смене услуги. Цену, которую мастер вписал вручную, не трогаем:
+// заменяем значение, только если поле пустое или там цена прежней услуги из прайса.
+function autofillPrice(prevService) {
+  const el = document.getElementById('form-appt-price');
+  if (!el) return;
+  const cur = el.value.trim();
+  const prevAuto = state.prices[prevService] != null ? String(state.prices[prevService]) : '';
+  if (cur === '' || cur === prevAuto) el.value = state.prices[selectedService] ?? '';
+}
+
 // Нажатия на кнопки переключения услуг и покрытий
 document.querySelectorAll('#service-selector .segment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     haptic('light');
+    const prevService = selectedService;
     selectedService = btn.dataset.service;
+    autofillPrice(prevService);
     updateServiceAndCoatingUI();
     checkConflicts();
   });
@@ -1210,6 +1223,7 @@ document.querySelectorAll('#setting-work-days-picker .day-toggle-pill').forEach(
 });
 
 async function openSettings() {
+  loadPrices().catch(() => {});
   try {
     const s = await api('/settings');
     const enabledCheck = document.getElementById('setting-notify-enabled');
@@ -1219,6 +1233,8 @@ async function openSettings() {
     const workStart = document.getElementById('setting-work-start');
     const workEnd = document.getElementById('setting-work-end');
 
+    const backupCheck = document.getElementById('setting-backup-enabled');
+    if (backupCheck) backupCheck.checked = s.backup_enabled !== false;
     if (enabledCheck) enabledCheck.checked = !!s.notify_enabled;
     if (newApptCheck) newApptCheck.checked = s.notify_new_appt !== false;
     if (timeInput) timeInput.value = s.notify_time || '22:00';
@@ -1255,6 +1271,7 @@ async function saveSettings() {
   const work_start_time = document.getElementById('setting-work-start')?.value || '09:00';
   const work_end_time = document.getElementById('setting-work-end')?.value || '20:00';
   const work_days = selectedWorkDays.join(',');
+  const backup_enabled = !!document.getElementById('setting-backup-enabled')?.checked;
 
   try {
     await api('/settings', {
@@ -1267,12 +1284,66 @@ async function saveSettings() {
         work_start_time,
         work_end_time,
         work_days,
+        backup_enabled,
       }),
     });
     haptic('success');
     showToast('Настройки сохранены ✅');
   } catch (err) {
     console.error('Ошибка сохранения настроек:', err);
+  }
+}
+
+// ===== ПРАЙС УСЛУГ =====
+const PRICE_SERVICES = ['manicure', 'pedicure', 'both', 'fingers'];
+
+function applyPricesToInputs() {
+  for (const s of PRICE_SERVICES) {
+    const el = document.getElementById(`setting-price-${s}`);
+    if (el) el.value = state.prices[s] ?? '';
+  }
+}
+
+async function loadPrices() {
+  state.prices = await api('/prices');
+  applyPricesToInputs();
+}
+
+async function savePrices() {
+  const body = {};
+  for (const s of PRICE_SERVICES) {
+    const el = document.getElementById(`setting-price-${s}`);
+    if (el?.validity?.badInput) return showToast('Цена — целое число, например 800');
+    const raw = el?.value?.trim() ?? '';
+    if (raw === '') { body[s] = null; continue; }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) return showToast('Цена — целое число, например 800');
+    body[s] = n;
+  }
+  try {
+    state.prices = await api('/prices', { method: 'PUT', body: JSON.stringify(body) });
+    applyPricesToInputs();
+    haptic('success');
+    showToast('Прайс сохранён ✅');
+  } catch (err) {
+    console.error('Ошибка сохранения прайса:', err);
+  }
+}
+
+async function exportFinance() {
+  haptic('light');
+  showToast('Формируем файл и отправляем в чат…');
+  try {
+    const res = await api('/export/finance', {
+      method: 'POST',
+      body: JSON.stringify({ period: income.period, date: income.anchor }),
+    });
+    if (res.ok) {
+      haptic('success');
+      showToast('📊 CSV за период отправлен в чат!');
+    }
+  } catch (err) {
+    console.error('Ошибка выгрузки доходов:', err);
   }
 }
 
@@ -1295,6 +1366,9 @@ async function exportData(format = 'csv') {
 
 document.getElementById('btn-save-settings')?.addEventListener('click', saveSettings);
 document.getElementById('btn-export-csv')?.addEventListener('click', () => exportData('csv'));
+document.getElementById('btn-export-json')?.addEventListener('click', () => exportData('json'));
+document.getElementById('btn-save-prices')?.addEventListener('click', savePrices);
+document.getElementById('btn-export-finance')?.addEventListener('click', exportFinance);
 
 // ===== 8. БАЗА КЛИЕНТОВ =====
 
@@ -2105,6 +2179,7 @@ async function init() {
   updateGreeting();
   goScreen('main');
   loadClientsDatalist().catch(() => {});
+  loadPrices().catch(() => {});
   await loadWeekSummary();
   await loadSelectedDay();
 }

@@ -25,7 +25,8 @@ import {
 import { parseAllowedIds } from './auth';
 import { addDays, nowInTz } from './lib/time';
 import { formatDay } from './lib/format';
-import { deleteMessage, escapeHtml, openAppKeyboard, sendMessage } from './bot/telegram';
+import { deleteMessage, escapeHtml, openAppKeyboard, sendDocument, sendMessage } from './bot/telegram';
+import { buildJsonBackup } from './lib/backup';
 
 const CUTOFF = '03:00';
 
@@ -236,6 +237,80 @@ export async function runBirthdayNotifications(env: Env, appUrl: string) {
       }
     } catch (e) {
       console.error('birthday notify error', userId, e);
+    }
+  }
+}
+
+// ===== Еженедельная резервная копия =====
+// «Слот» — воскресенье 21:00 по часовому поясу мастера. Копия отправляется, если за последний прошедший
+// слот её ещё не слали (так пропущенное из-за сбоя досылается, а не теряется до следующей недели).
+// users.last_backup_date хранит дату слота; бронь делается атомарным UPDATE, как у вечернего уведомления.
+// Первая копия после включения функции уходит сразу (last_backup_date ещё пуст) — заодно видно, что всё работает.
+export const BACKUP_TIME = '21:00';
+
+/** Чистая функция: пора ли слать копию и за какой слот (дату воскресенья). */
+export function backupDecision(
+  nowDate: string,
+  nowTime: string,
+  lastBackupDate: string | null,
+): { send: boolean; slot: string } {
+  const dow = new Date(nowDate + 'T00:00:00Z').getUTCDay(); // 0 = воскресенье
+  const daysBack = dow === 0 ? (nowTime >= BACKUP_TIME ? 0 : 7) : dow;
+  const slot = addDays(nowDate, -daysBack);
+  return { send: lastBackupDate !== slot, slot };
+}
+
+export async function runWeeklyBackups(env: Env) {
+  for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
+    try {
+      const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
+      if (u.backup_enabled === 0) continue;
+
+      const now = nowInTz(u.tz || env.TZ);
+      const previous = u.last_backup_date ?? null;
+      const { send, slot } = backupDecision(now.date, now.time, previous);
+      if (!send) continue;
+
+      const claim = await env.DB
+        .prepare(
+          'UPDATE users SET last_backup_date=? WHERE user_id=? AND (last_backup_date IS NULL OR last_backup_date != ?)',
+        )
+        .bind(slot, userId, slot)
+        .run();
+      if (!claim.meta.changes) continue;
+
+      let outcome: SendOutcome = 'retry';
+      try {
+        const json = await buildJsonBackup(env.DB, userId, env.TZ);
+        outcome = classifySend(
+          await sendDocument(
+            env,
+            userId,
+            new Blob([json], { type: 'application/json; charset=utf-8' }),
+            `nail-planner-backup-${now.date}.json`,
+            `💾 Еженедельная резервная копия (${now.date})`,
+          ),
+        );
+      } catch (e) {
+        console.error('backup send failed', userId, e);
+      }
+
+      if (outcome === 'sent') {
+        console.log(`backup sent user=${userId} slot=${slot}`);
+      } else if (outcome === 'blocked') {
+        console.warn(`backup blocked (403) user=${userId}: бот заблокирован или чат недоступен, до следующей недели не пытаемся`);
+      } else {
+        try {
+          await env.DB
+            .prepare('UPDATE users SET last_backup_date=? WHERE user_id=? AND last_backup_date=?')
+            .bind(previous, userId, slot)
+            .run();
+        } catch (e) {
+          console.error('backup rollback failed', userId, e);
+        }
+      }
+    } catch (e) {
+      console.error('backup error', userId, e);
     }
   }
 }

@@ -50,6 +50,8 @@ export interface UserRow {
   work_end_time?: string;   // '20:00'
   work_days?: string;       // '1,2,3,4,5,6' (1=Пн, 7=Вс)
   last_birthday_notify_date?: string | null;
+  backup_enabled?: number;          // 1 — присылать еженедельную копию (по умолчанию)
+  last_backup_date?: string | null; // дата воскресного «слота», за который копия отправлена
 }
 
 export interface Client {

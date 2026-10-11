@@ -16,6 +16,7 @@ settings.get('/', async (c) => {
     work_start_time: u.work_start_time || '09:00',
     work_end_time: u.work_end_time || '20:00',
     work_days: u.work_days || '1,2,3,4,5,6',
+    backup_enabled: u.backup_enabled !== 0,
   });
 });
 
@@ -33,6 +34,7 @@ settings.put('/', async (c) => {
     work_start_time,
     work_end_time,
     work_days,
+    backup_enabled,
   } = body as Record<string, unknown>;
 
   if (typeof notify_enabled !== 'boolean') {
@@ -41,6 +43,10 @@ settings.put('/', async (c) => {
 
   if (notify_new_appt !== undefined && typeof notify_new_appt !== 'boolean') {
     return c.json({ error: 'notify_new_appt должен быть булевым значением' }, 400);
+  }
+
+  if (backup_enabled !== undefined && typeof backup_enabled !== 'boolean') {
+    return c.json({ error: 'backup_enabled должен быть булевым значением' }, 400);
   }
 
   if (!isTime(notify_time)) {
@@ -75,6 +81,7 @@ settings.put('/', async (c) => {
     work_start_time: typeof work_start_time === 'string' ? work_start_time : current.work_start_time,
     work_end_time: typeof work_end_time === 'string' ? work_end_time : current.work_end_time,
     work_days: typeof work_days === 'string' ? work_days : current.work_days,
+    backup_enabled: backup_enabled === undefined ? current.backup_enabled : backup_enabled,
   });
 
   return c.json({
@@ -85,5 +92,6 @@ settings.put('/', async (c) => {
     work_start_time: updated.work_start_time || '09:00',
     work_end_time: updated.work_end_time || '20:00',
     work_days: updated.work_days || '1,2,3,4,5,6',
+    backup_enabled: updated.backup_enabled !== 0,
   });
 });
