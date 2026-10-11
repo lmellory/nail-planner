@@ -1,7 +1,7 @@
 // Экспорт данных пользователя: CSV (UTF-8 с BOM, разделитель «;»), JSON и отправка в чат ботом
 import { Hono, type Context } from 'hono';
 import type { Appointment, AppVars, Env } from '../types';
-import { ensureUser, getAllAppointments, getAllDayNotes } from '../db';
+import { ensureUser, getAllAppointments, getAllDayNotes, getAllExpenses } from '../db';
 import { sendDocument } from '../bot/telegram';
 import { nowInTz } from '../lib/time';
 
@@ -67,6 +67,7 @@ export function buildCsv(items: Appointment[]): string {
 export async function buildJsonBackup(db: D1Database, userId: number, fallbackTz: string) {
   const appointments = await getAllAppointments(db, userId);
   const day_notes = await getAllDayNotes(db, userId);
+  const expenses = await getAllExpenses(db, userId);
   const u = await ensureUser(db, userId, fallbackTz);
   const settings = {
     notify_enabled: !!u.notify_enabled,
@@ -74,7 +75,7 @@ export async function buildJsonBackup(db: D1Database, userId: number, fallbackTz
     tz: u.tz,
     notify_new_appt: !!u.notify_new_appt,
   };
-  return JSON.stringify({ appointments, day_notes, settings }, null, 2);
+  return JSON.stringify({ appointments, expenses, day_notes, settings }, null, 2);
 }
 
 async function handleCsv(c: Context<{ Bindings: Env; Variables: AppVars }>) {

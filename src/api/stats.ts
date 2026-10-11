@@ -1,8 +1,8 @@
-// Доходы: GET /api/stats?period=week|month|year&date=YYYY-MM-DD
+// Доходы и траты: GET /api/stats?period=week|month|year&date=YYYY-MM-DD
 // date — любая дата внутри нужного периода (по умолчанию «сегодня» в часовом поясе мастера).
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
-import { ensureUser, getIncomeByDay } from '../db';
+import { ensureUser, getExpensesByDay, getExpensesByName, getIncomeByDay } from '../db';
 import { isDate, nowInTz } from '../lib/time';
 import { buildIncomeReport, isPeriod, periodRange, previousRange } from '../lib/stats';
 
@@ -23,9 +23,12 @@ stats.get('/', async (c) => {
 
   const { from, to } = periodRange(period, date);
   const prev = previousRange(period, date);
-  const [rows, prevRows] = await Promise.all([
+  const [rows, prevRows, expRows, prevExpRows, materials] = await Promise.all([
     getIncomeByDay(c.env.DB, userId, from, to),
     getIncomeByDay(c.env.DB, userId, prev.from, prev.to),
+    getExpensesByDay(c.env.DB, userId, from, to),
+    getExpensesByDay(c.env.DB, userId, prev.from, prev.to),
+    getExpensesByName(c.env.DB, userId, from, to),
   ]);
-  return c.json(buildIncomeReport(period, from, to, rows, prevRows));
+  return c.json(buildIncomeReport(period, from, to, rows, prevRows, expRows, prevExpRows, materials));
 });

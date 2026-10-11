@@ -432,6 +432,11 @@
           </button>
         </div>
 
+        <div class="segmented-control income-metric" id="income-metric-selector">
+          <button type="button" class="segment-btn active" data-metric="income">Доход</button>
+          <button type="button" class="segment-btn" data-metric="expense">Траты</button>
+        </div>
+
         <div class="income-total-card">
           <div class="income-total-label" id="income-focus-label">Доход</div>
           <div class="income-total-value" id="income-total-value">—</div>
@@ -441,7 +446,22 @@
         <div class="income-chart-card">
           <div class="income-chart" id="income-chart"></div>
           <div class="income-axis" id="income-axis"></div>
-          <div class="income-chart-hint">Нажми на столбик, чтобы увидеть сумму за этот день</div>
+          <div class="income-chart-hint">Нажми на столбик, чтобы увидеть сумму</div>
+        </div>
+
+        <div class="income-summary">
+          <div class="income-stat">
+            <div class="income-stat-value" id="income-sum-income">—</div>
+            <div class="income-stat-label">Доход</div>
+          </div>
+          <div class="income-stat">
+            <div class="income-stat-value" id="income-sum-expense">—</div>
+            <div class="income-stat-label">Траты</div>
+          </div>
+          <div class="income-stat">
+            <div class="income-stat-value" id="income-sum-profit">—</div>
+            <div class="income-stat-label">Прибыль</div>
+          </div>
         </div>
 
         <div class="income-stats">
@@ -456,6 +476,34 @@
         </div>
 
         <div class="income-note" id="income-note" style="display: none;"></div>
+
+        <div class="materials-card">
+          <div class="materials-title">Траты по материалам</div>
+          <div id="income-materials"></div>
+        </div>
+
+        <div class="income-actions">
+          <button type="button" class="btn btn-primary" id="btn-add-expense">+ Добавить трату</button>
+          <button type="button" class="btn btn-secondary" id="btn-open-expenses">Все траты за период</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ЭКРАН 9: Траты (список за период) -->
+    <section class="screen" id="screen-expenses">
+      <div class="screen-content">
+        <div class="screen-sub-header">
+          <button type="button" class="btn-subtle" id="btn-back-from-expenses">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <h2>Траты</h2>
+          <button type="button" class="btn-primary-small" id="btn-add-expense-list">+ Новая</button>
+        </div>
+        <div class="expenses-period" id="expenses-period-label"></div>
+        <div class="expenses-total" id="expenses-total"></div>
+        <div class="expenses-list" id="expenses-list">
+          <div class="loading-spinner">Загрузка…</div>
+        </div>
       </div>
     </section>
 
@@ -575,6 +623,38 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" id="btn-cancel-client-edit">Отмена</button>
           <button type="button" class="btn btn-primary" id="btn-save-client">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- МОДАЛКА: Трата на материал -->
+    <div class="modal-overlay" id="modal-expense-edit" style="display: none;">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3 id="modal-expense-title">Новая трата</h3>
+          <button type="button" class="modal-close-btn" id="btn-close-expense-edit">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="edit-expense-id">
+          <div class="form-group">
+            <label for="edit-expense-date">Дата *</label>
+            <input type="date" id="edit-expense-date" class="form-input">
+          </div>
+          <div class="form-group">
+            <label for="edit-expense-name">На что потрачено *</label>
+            <input type="text" id="edit-expense-name" class="form-input" list="expense-names-datalist" placeholder="Например: Гель-лак" maxlength="100" autocomplete="off">
+            <datalist id="expense-names-datalist"></datalist>
+            <span class="field-hint">Одинаковые названия суммируются в «Траты по материалам»</span>
+          </div>
+          <div class="form-group">
+            <label for="edit-expense-amount">Сумма *</label>
+            <input type="number" id="edit-expense-amount" class="form-input" inputmode="numeric" min="1" max="10000000" step="1" placeholder="Например: 450">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" id="btn-delete-expense" style="display: none;">🗑</button>
+          <button type="button" class="btn btn-secondary" id="btn-cancel-expense-edit">Отмена</button>
+          <button type="button" class="btn btn-primary" id="btn-save-expense">Сохранить</button>
         </div>
       </div>
     </div>

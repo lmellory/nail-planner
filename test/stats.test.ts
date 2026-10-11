@@ -97,3 +97,40 @@ describe('isPeriod', () => {
     expect(isPeriod(undefined)).toBe(false);
   });
 });
+
+describe('траты и прибыль', () => {
+  it('корзины получают траты по дням; год — по месяцам', () => {
+    const week = buildBuckets('week', '2026-10-05', '2026-10-11', [], [
+      { date: '2026-10-06', sum: 450, count: 1 },
+      { date: '2026-10-06', sum: 150, count: 2 },
+    ]);
+    expect(week[1]).toMatchObject({ expense: 600, expense_count: 3 });
+    expect(week[0].expense).toBe(0);
+
+    const year = buildBuckets('year', '2026-01-01', '2026-12-31', [], [
+      { date: '2026-03-02', sum: 100, count: 1 },
+      { date: '2026-03-30', sum: 200, count: 1 },
+    ]);
+    expect(year[2]).toMatchObject({ expense: 300, expense_count: 2 });
+  });
+
+  it('отчёт: траты, прибыль, прошлый период, материалы', () => {
+    const r = buildIncomeReport(
+      'month', '2026-10-01', '2026-10-31',
+      [{ date: '2026-10-05', sum: 5000, paid: 4, unpaid: 0 }],
+      [],
+      [{ date: '2026-10-03', sum: 1200, count: 2 }, { date: '2026-10-20', sum: 800, count: 1 }],
+      [{ date: '2026-09-10', sum: 1500, count: 3 }],
+      [{ name: 'Гель-лак', sum: 1500, count: 2 }, { name: 'Пилки', sum: 500, count: 1 }],
+    );
+    expect(r).toMatchObject({ total: 5000, total_expense: 2000, expense_count: 3, prev_expense: 1500, profit: 3000 });
+    expect(r.materials).toEqual([{ name: 'Гель-лак', sum: 1500, count: 2 }, { name: 'Пилки', sum: 500, count: 1 }]);
+  });
+
+  it('траты больше дохода → отрицательная прибыль; без трат всё по нулям', () => {
+    const loss = buildIncomeReport('week', '2026-10-05', '2026-10-11', [], [], [{ date: '2026-10-05', sum: 700, count: 1 }]);
+    expect(loss.profit).toBe(-700);
+    const none = buildIncomeReport('week', '2026-10-05', '2026-10-11', [], []);
+    expect(none).toMatchObject({ total_expense: 0, profit: 0, prev_expense: 0, materials: [] });
+  });
+});

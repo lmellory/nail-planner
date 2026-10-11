@@ -9,6 +9,7 @@ import { days } from './api/days';
 import { search } from './api/search';
 import { settings } from './api/settings';
 import { stats } from './api/stats';
+import { expenses } from './api/expenses';
 import { exporter } from './api/export';
 import { webhook } from './bot/webhook';
 import { runNotifications } from './cron';
@@ -44,6 +45,7 @@ app.route('/api/days', days);
 app.route('/api/search', search);
 app.route('/api/settings', settings);
 app.route('/api/stats', stats);
+app.route('/api/expenses', expenses);
 app.route('/api/export', exporter);
 
 app.onError((err, c) => {

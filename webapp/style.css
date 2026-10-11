@@ -1729,3 +1729,95 @@ body {
   .header-actions { gap: 2px; }
   .header-actions .icon-btn { width: 36px; height: 36px; }
 }
+
+
+/* ==========================================================================
+   Траты на материалы
+   ========================================================================== */
+.income-metric { margin-bottom: 12px; }
+
+.income-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.income-summary .income-stat { padding: 10px 6px; }
+.income-summary .income-stat-value { font-size: 14px; overflow-wrap: anywhere; }
+.income-stat-value.is-plus { color: #2e9a62; }
+.income-stat-value.is-minus { color: var(--danger-color); }
+
+/* Столбики трат — голубой оттенок, чтобы не путать с доходом */
+.income-chart.is-expense .income-bar-fill { background: #a9bce6; }
+.income-chart.is-expense .income-bar.is-empty .income-bar-fill { background: rgba(120, 140, 200, 0.16); }
+.income-chart.is-expense .income-bar.is-today .income-bar-fill { background: #8aa2dc; }
+.income-chart.is-expense .income-bar.is-selected .income-bar-fill { background: #4f6bbd; }
+
+.materials-card {
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: var(--card-shadow);
+  margin: 12px 0;
+}
+.materials-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+.materials-empty { font-size: 13px; color: var(--hint-color); text-align: center; padding: 6px 0; }
+.materials-more { font-size: 12px; color: var(--hint-color); text-align: center; padding-top: 6px; }
+
+.material-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.material-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(120, 140, 200, 0.16);
+  border-radius: var(--radius-sm);
+}
+.material-info { position: relative; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.material-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.material-count { font-size: 12px; color: var(--hint-color); flex-shrink: 0; }
+.material-sum { position: relative; font-size: 14px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.income-actions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.income-actions .btn { width: 100%; }
+
+/* Список трат */
+.expenses-period { font-size: 14px; font-weight: 600; text-align: center; color: var(--hint-color); }
+.expenses-total { font-size: 22px; font-weight: 800; text-align: center; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+.expenses-day {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--hint-color);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 14px 4px 6px;
+}
+.expense-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: var(--card-shadow);
+  cursor: pointer;
+}
+.expense-name { font-size: 15px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.expense-amount { font-size: 15px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.expenses-empty { text-align: center; color: var(--hint-color); padding: 28px 0; font-size: 14px; }
+
+#btn-delete-expense { flex: 0 0 56px; }

@@ -1,6 +1,6 @@
 // Все запросы к D1. ВАЖНО: каждый запрос фильтруется по user_id.
-import type { Appointment, Client, UserRow } from './types';
-import type { DayRow } from './lib/stats';
+import type { Appointment, Client, Expense, ExpenseInput, UserRow } from './types';
+import type { DayRow, ExpenseDayRow, MaterialRow } from './lib/stats';
 
 export type AppointmentInput = Omit<Appointment, 'id' | 'user_id'>;
 export type ClientInput = { name: string; phone?: string | null; telegram?: string | null; notes?: string | null; birthday?: string | null };
@@ -405,5 +405,92 @@ export async function getAllDayNotes(db: D1Database, userId: number): Promise<{ 
     .prepare('SELECT date, text FROM day_notes WHERE user_id = ? ORDER BY date')
     .bind(userId)
     .all<{ date: string; text: string }>();
+  return r.results;
+}
+
+// ===== Траты на материалы =====
+
+export async function listExpenses(db: D1Database, userId: number, from: string, to: string): Promise<Expense[]> {
+  const r = await db
+    .prepare(
+      `SELECT id, user_id, date, name, amount FROM expenses
+       WHERE user_id = ? AND date >= ? AND date <= ?
+       ORDER BY date DESC, id DESC LIMIT 1000`,
+    )
+    .bind(userId, from, to)
+    .all<Expense>();
+  return r.results;
+}
+
+export async function getExpense(db: D1Database, userId: number, id: number): Promise<Expense | null> {
+  return db
+    .prepare('SELECT id, user_id, date, name, amount FROM expenses WHERE user_id = ? AND id = ?')
+    .bind(userId, id)
+    .first<Expense>();
+}
+
+export async function insertExpense(db: D1Database, userId: number, data: ExpenseInput): Promise<number> {
+  const res = await db
+    .prepare('INSERT INTO expenses (user_id, date, name, amount) VALUES (?,?,?,?)')
+    .bind(userId, data.date, data.name, data.amount)
+    .run();
+  return res.meta.last_row_id as number;
+}
+
+export async function updateExpense(db: D1Database, userId: number, id: number, data: ExpenseInput): Promise<boolean> {
+  const res = await db
+    .prepare("UPDATE expenses SET date=?, name=?, amount=?, updated_at=datetime('now') WHERE user_id=? AND id=?")
+    .bind(data.date, data.name, data.amount, userId, id)
+    .run();
+  return (res.meta.changes ?? 0) > 0;
+}
+
+export async function deleteExpense(db: D1Database, userId: number, id: number): Promise<boolean> {
+  const res = await db.prepare('DELETE FROM expenses WHERE user_id=? AND id=?').bind(userId, id).run();
+  return (res.meta.changes ?? 0) > 0;
+}
+
+/** Траты по дням за период: сумма и число покупок. */
+export async function getExpensesByDay(db: D1Database, userId: number, from: string, to: string): Promise<ExpenseDayRow[]> {
+  const r = await db
+    .prepare(
+      `SELECT date, SUM(amount) AS sum, COUNT(*) AS count FROM expenses
+       WHERE user_id = ? AND date >= ? AND date <= ? GROUP BY date`,
+    )
+    .bind(userId, from, to)
+    .all<ExpenseDayRow>();
+  return r.results;
+}
+
+/** Траты по материалам за период (самые большие сверху). */
+export async function getExpensesByName(db: D1Database, userId: number, from: string, to: string): Promise<MaterialRow[]> {
+  const r = await db
+    .prepare(
+      `SELECT name, SUM(amount) AS sum, COUNT(*) AS count FROM expenses
+       WHERE user_id = ? AND date >= ? AND date <= ?
+       GROUP BY name ORDER BY sum DESC, name LIMIT 100`,
+    )
+    .bind(userId, from, to)
+    .all<MaterialRow>();
+  return r.results;
+}
+
+/** Ранее использованные названия: частые и свежие сверху (для подсказок в форме). */
+export async function listExpenseNames(db: D1Database, userId: number): Promise<string[]> {
+  const r = await db
+    .prepare(
+      `SELECT name FROM expenses WHERE user_id = ?
+       GROUP BY name ORDER BY COUNT(*) DESC, MAX(date) DESC LIMIT 100`,
+    )
+    .bind(userId)
+    .all<{ name: string }>();
+  return r.results.map((x) => x.name);
+}
+
+export async function getAllExpenses(db: D1Database, userId: number): Promise<Expense[]> {
+  const r = await db
+    .prepare('SELECT id, user_id, date, name, amount FROM expenses WHERE user_id = ? ORDER BY date, id')
+    .bind(userId)
+    .all<Expense>();
   return r.results;
 }

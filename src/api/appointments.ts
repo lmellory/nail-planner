@@ -15,21 +15,13 @@ import {
 } from '../db';
 import { addMinutes, defaultServiceDuration, isDate, isTime } from '../lib/time';
 import { escapeHtml, sendMessage } from '../bot/telegram';
+import { parseAmount } from '../lib/money';
 import { serviceLabel, timeLabel } from '../lib/format';
 
 export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
 const SERVICES = ['manicure', 'pedicure', 'both', 'fingers'];
 const COATINGS = ['gel', 'none'];
-export const MAX_PRICE = 10_000_000;
-
-/** Цена: пусто → null, иначе целое число от 0 до MAX_PRICE (допускаются пробелы: «1 500»). */
-function parsePrice(raw: unknown): { ok: true; value: number | null } | { ok: false } {
-  if (raw === undefined || raw === null || raw === '') return { ok: true, value: null };
-  const n = typeof raw === 'number' ? raw : Number(String(raw).replace(/\s/g, '').replace(',', '.'));
-  if (!Number.isInteger(n) || n < 0 || n > MAX_PRICE) return { ok: false };
-  return { ok: true, value: n };
-}
 
 /** Проверка и нормализация тела запроса. Возвращает [данные, ошибка]. */
 export function validate(b: any) {
@@ -52,8 +44,8 @@ export function validate(b: any) {
   if ((needM && !COATINGS.includes(mc)) || (needP && !COATINGS.includes(pc)))
     return [null, 'Укажи покрытие: с покрытием или без'] as const;
 
-  const price = parsePrice(b?.price);
-  if (!price.ok) return [null, 'Цена: целое число от 0 до 10 000 000'] as const;
+  const price = parseAmount(b?.price);
+  if (price === undefined) return [null, 'Цена: целое число от 0 до 10 000 000'] as const;
 
   return [{
     date: b.date as string,
@@ -65,7 +57,7 @@ export function validate(b: any) {
     manicure_coating: mc as 'gel' | 'none' | null,
     pedicure_coating: pc as 'gel' | 'none' | null,
     comment: b.comment ? String(b.comment).slice(0, 1000) : null,
-    price: price.value,
+    price,
   }, null] as const;
 }
 

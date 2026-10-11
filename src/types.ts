@@ -30,6 +30,15 @@ export interface Appointment {
   price: number | null; // цена в валюте мастера, целое число; null — не указана
 }
 
+export interface Expense {
+  id: number;
+  user_id: number;
+  date: string;   // YYYY-MM-DD
+  name: string;   // на что потрачено
+  amount: number; // целое число > 0
+}
+export type ExpenseInput = Omit<Expense, 'id' | 'user_id'>;
+
 export interface UserRow {
   user_id: number;
   tz: string;
