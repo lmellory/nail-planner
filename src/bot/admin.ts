@@ -1,5 +1,5 @@
-// Команды администратора. Администратор задаётся переменной ADMIN_ID (его Telegram ID).
-// Для всех остальных (в том числе для других мастеров из ALLOWED_IDS) бот на эти команды молчит.
+// Команды администратора. Администраторы задаются переменной ADMIN_ID (Telegram ID через запятую).
+// Для всех остальных (в том числе для мастеров) бот на эти команды молчит.
 //
 // Команды:
 //   /admin            — список команд
@@ -11,9 +11,11 @@
 //   /records [ID]     — CSV (для Excel) со всеми записями за всё время: всех мастеров или одного
 //   /backupall        — JSON-копии данных всех пользователей
 //   /send ID текст    — сообщение одному пользователю
-//   /broadcast текст  — сообщение всем мастерам из ALLOWED_IDS
+//   /broadcast текст  — сообщение всем, у кого есть доступ
+//   /adduser ID       — выдать доступ к боту и приложению
+//   /ban ID, /unban ID — закрыть доступ / вернуть его (данные пользователя не удаляются)
 // Наблюдатели (VIEWER_IDS) могут только /records (и /admin со своим списком): смотреть и выгружать записи.
-// Разрушающих команд (удаление данных, смена доступа) нет намеренно: доступ задаётся секретом ALLOWED_IDS.
+// Данные командами не удаляются; записи админ правит в Mini App (админ-панель).
 import type { Appointment, Env } from '../types';
 import {
   getAllAppointments,
@@ -25,7 +27,7 @@ import {
   listUsersAdmin,
   listUsersOverview,
 } from '../db';
-import { parseAllowedIds } from '../auth';
+import { getAccessSnapshot, getAccessState, getAllowedIds, grantAccess, isAdmin, parseIdList, setBanned } from '../lib/access';
 import { buildJsonBackup } from '../lib/backup';
 import { buildCsv } from '../api/export';
 import { classifySend } from '../cron';
@@ -33,15 +35,12 @@ import { periodRange } from '../lib/stats';
 import { addDays, nowInTz } from '../lib/time';
 import { escapeHtml, getMe, getWebhookInfo, sendDocument, sendMessage } from './telegram';
 
-/** true, если userId совпадает с ADMIN_ID. Пустой или некорректный ADMIN_ID = администратора нет. */
-export function isAdmin(env: Pick<Env, 'ADMIN_ID'>, userId: number): boolean {
-  const id = Number((env.ADMIN_ID ?? '').trim());
-  return Number.isInteger(id) && id > 0 && id === userId;
-}
+// isAdmin живёт в lib/access.ts (его же использует проверка доступа в приложении); здесь — для удобства бота и тестов
+export { isAdmin };
 
 /** true, если userId есть в VIEWER_IDS (список через запятую). Наблюдатель только смотрит записи. */
 export function isViewer(env: Pick<Env, 'VIEWER_IDS'>, userId: number): boolean {
-  return parseAllowedIds(env.VIEWER_IDS ?? '').includes(userId);
+  return parseIdList(env.VIEWER_IDS).includes(userId);
 }
 
 export type StaffRole = 'admin' | 'viewer';
@@ -58,6 +57,9 @@ export const ADMIN_COMMANDS = [
   '/backupall',
   '/send',
   '/broadcast',
+  '/adduser',
+  '/ban',
+  '/unban',
 ] as const;
 
 export const isAdminCommand = (cmd: string): boolean => (ADMIN_COMMANDS as readonly string[]).includes(cmd);
@@ -83,7 +85,11 @@ const HELP =
   '/records <code>ID</code> — все записи одного мастера\n' +
   '/backupall — JSON-копии всех пользователей\n' +
   '/send <code>ID текст</code> — сообщение одному пользователю\n' +
-  '/broadcast <code>текст</code> — сообщение всем мастерам из ALLOWED_IDS';
+  '/broadcast <code>текст</code> — сообщение всем, у кого есть доступ\n' +
+  '/adduser <code>ID</code> — выдать доступ к боту и приложению\n' +
+  '/ban <code>ID</code> — закрыть доступ (данные остаются)\n' +
+  '/unban <code>ID</code> — вернуть доступ\n\n' +
+  '✏️ Записи мастеров правятся в приложении: кнопка 🛠 в шапке.';
 
 const VIEWER_HELP =
   '👁 <b>Команды наблюдателя</b>\n\n' +
@@ -95,6 +101,7 @@ const USAGE_EXPORT = 'Использование: <code>/export ID</code>, на�
 const USAGE_USER = 'Использование: <code>/user ID</code>, например <code>/user 123456789</code>.';
 const USAGE_SEND = 'Использование: <code>/send ID текст</code>, например <code>/send 123456789 Привет!</code>';
 const USAGE_BROADCAST = 'Использование: <code>/broadcast текст</code>';
+const usageAccess = (cmd: string) => `Использование: <code>${cmd} ID</code>, например <code>${cmd} 123456789</code>.`;
 
 const isId = (s: string) => /^\d{1,15}$/.test(s);
 const onOff = (v: unknown) => (v ? 'вкл' : 'выкл');
@@ -144,6 +151,10 @@ export async function handleAdminCommand(
       return handleSendCommand(env, chatId, adminId, arg);
     case '/broadcast':
       return handleBroadcastCommand(env, chatId, adminId, arg);
+    case '/adduser':
+    case '/ban':
+    case '/unban':
+      return handleAccessCommand(env, chatId, adminId, cmd, arg.split(/\s+/)[0]);
   }
 }
 
@@ -151,18 +162,18 @@ export async function handleAdminCommand(
 export async function handleUsersCommand(env: Env, chatId: number): Promise<void> {
   const { date } = nowInTz(env.TZ);
   const rows = await listUsersAdmin(env.DB, date);
-  const allowed = parseAllowedIds(env.ALLOWED_IDS);
+  const { allowed, banned } = await getAccessSnapshot(env);
   const inDb = new Set(rows.map((r) => r.user_id));
 
   const lines = rows.slice(0, MAX_USERS_SHOWN).map((u) => {
-    const access = allowed.includes(u.user_id) ? '✅' : '⛔';
+    const access = banned.includes(u.user_id) ? '🚫' : allowed.includes(u.user_id) ? '✅' : '⛔';
     const last = u.last_appointment ? `, последняя запись ${u.last_appointment}` : '';
     return `${access} <code>${u.user_id}</code> — записей ${u.appointments} (впереди ${u.upcoming}), клиентов ${u.clients}${last}`;
   });
   if (rows.length > MAX_USERS_SHOWN) lines.push(`…и ещё ${rows.length - MAX_USERS_SHOWN}`);
 
   let text = `👤 <b>Пользователи</b> (${rows.length})\n\n${lines.length ? lines.join('\n') : 'пока никого'}`;
-  text += '\n\n✅ доступ есть · ⛔ нет в ALLOWED_IDS';
+  text += '\n\n✅ доступ есть · ⛔ доступа нет · 🚫 заблокирован';
   const neverOpened = allowed.filter((id) => !inDb.has(id));
   if (neverOpened.length) {
     text += `\n\nЕсть доступ, но ещё не открывали бота: ${neverOpened.map((id) => `<code>${id}</code>`).join(', ')}`;
@@ -192,11 +203,11 @@ export async function handleUserCommand(env: Env, chatId: number, arg?: string):
   const now = nowInTz(u.tz || env.TZ);
   const month = periodRange('month', now.date);
   const income = await getUserIncomeTotal(env.DB, id, month.from, month.to, now.date, now.time);
-  const hasAccess = parseAllowedIds(env.ALLOWED_IDS).includes(id);
+  const access = await getAccessState(env, id);
 
   const text =
     `👤 <b>Пользователь</b> <code>${id}</code>\n\n` +
-    `Доступ: ${hasAccess ? '✅ есть' : '⛔ нет в ALLOWED_IDS'}\n` +
+    `Доступ: ${access === 'allowed' ? '✅ есть' : access === 'banned' ? '🚫 заблокирован' : '⛔ нет'}\n` +
     `В базе с: ${escapeHtml(String(u.created_at ?? '—'))}\n` +
     `Часовой пояс: ${escapeHtml(u.tz)}\n\n` +
     `📅 Записей: ${u.appointments} (впереди ${u.upcoming})\n` +
@@ -214,7 +225,7 @@ export async function handleUserCommand(env: Env, chatId: number, arg?: string):
 export async function handleStatsCommand(env: Env, chatId: number): Promise<void> {
   const { date } = nowInTz(env.TZ);
   const g = await getGlobalStats(env.DB, date, addDays(date, 1), addDays(date, -7));
-  const allowed = parseAllowedIds(env.ALLOWED_IDS).length;
+  const allowed = (await getAllowedIds(env)).length;
   await sendMessage(
     env,
     chatId,
@@ -270,7 +281,7 @@ export async function handleHealthCommand(env: Env, chatId: number): Promise<voi
 
   lines.push(
     `⚙️ Конфигурация: Turso ${env.TURSO_URL && env.TURSO_AUTH_TOKEN ? 'подключён' : 'не задан'}, ` +
-      `ALLOWED_IDS: ${parseAllowedIds(env.ALLOWED_IDS).length}, APP_URL ${env.APP_URL ? 'задан' : 'не задан'}`,
+      `с доступом: ${(await getAllowedIds(env)).length}, ALLOWED_IDS: ${parseIdList(env.ALLOWED_IDS).length}, APP_URL ${env.APP_URL ? 'задан' : 'не задан'}`,
   );
   await sendMessage(env, chatId, `🩺 <b>Состояние</b>\n\n${lines.join('\n')}`);
 }
@@ -373,9 +384,9 @@ export async function handleSendCommand(env: Env, chatId: number, adminId: numbe
     return;
   }
   const targetId = Number(idRaw);
-  const known = parseAllowedIds(env.ALLOWED_IDS).includes(targetId) || !!(await getUser(env.DB, targetId));
+  const known = (await getAllowedIds(env)).includes(targetId) || !!(await getUser(env.DB, targetId));
   if (!known) {
-    await sendMessage(env, chatId, `Пользователь <code>${targetId}</code> не найден ни в базе, ни в ALLOWED_IDS.`);
+    await sendMessage(env, chatId, `Пользователь <code>${targetId}</code> не найден ни в базе, ни среди тех, у кого есть доступ.`);
     return;
   }
 
@@ -390,7 +401,7 @@ export async function handleSendCommand(env: Env, chatId: number, adminId: numbe
   console.log(`admin send admin=${adminId} target=${targetId} outcome=${outcome}`);
 }
 
-/** /broadcast текст — сообщение всем мастерам из ALLOWED_IDS (обычным текстом, без разметки). */
+/** /broadcast текст — сообщение всем, у кого есть доступ (обычным текстом, без разметки). */
 export async function handleBroadcastCommand(env: Env, chatId: number, adminId: number, text: string): Promise<void> {
   if (!text) {
     await sendMessage(env, chatId, USAGE_BROADCAST);
@@ -400,9 +411,9 @@ export async function handleBroadcastCommand(env: Env, chatId: number, adminId: 
     await sendMessage(env, chatId, `Слишком длинный текст: ${text.length} символов, максимум ${MAX_ANNOUNCE_LENGTH}.`);
     return;
   }
-  const recipients = parseAllowedIds(env.ALLOWED_IDS);
+  const recipients = await getAllowedIds(env);
   if (!recipients.length) {
-    await sendMessage(env, chatId, 'Список ALLOWED_IDS пуст: рассылать некому.');
+    await sendMessage(env, chatId, 'Ни у кого нет доступа: рассылать некому.');
     return;
   }
 
@@ -466,4 +477,72 @@ export async function handleRecordsCommand(env: Env, chatId: number, viewerId: n
   );
   if (!r.ok) await sendMessage(env, chatId, 'Не удалось отправить файл в Telegram, попробуйте ещё раз.');
   console.log(`records viewer=${viewerId} target=${arg ?? 'all'} appointments=${items.length} ok=${r.ok}`);
+}
+
+/**
+ * /adduser ID — выдать доступ; /ban ID — закрыть доступ; /unban ID — вернуть.
+ * Блокировка сильнее и ALLOWED_IDS, и /adduser. Данные пользователя не удаляются: после /unban всё на месте.
+ */
+export async function handleAccessCommand(env: Env, chatId: number, adminId: number, cmd: string, arg?: string): Promise<void> {
+  if (!arg) {
+    await sendMessage(env, chatId, usageAccess(cmd));
+    return;
+  }
+  if (!isId(arg)) {
+    await sendMessage(env, chatId, `Некорректный ID.\n${usageAccess(cmd)}`);
+    return;
+  }
+  const id = Number(arg);
+  const state = await getAccessState(env, id);
+
+  if (cmd === '/adduser') {
+    if (state === 'allowed') {
+      await sendMessage(env, chatId, `У <code>${id}</code> доступ уже есть.`);
+      return;
+    }
+    if (state === 'banned') {
+      await sendMessage(env, chatId, `<code>${id}</code> заблокирован. Сначала <code>/unban ${id}</code>.`);
+      return;
+    }
+    await grantAccess(env.DB, id);
+    // Сообщаем пользователю; если он ещё не писал боту (403), администратору скажем об этом
+    const r = await sendMessage(env, id, '✅ Вам открыт доступ к ежедневнику. Отправьте /start, чтобы начать.');
+    await sendMessage(
+      env,
+      chatId,
+      `✅ Доступ выдан: <code>${id}</code>.` + (r.ok ? '' : '\nПользователь ещё не писал боту: пусть откроет бота и отправит /start.'),
+    );
+    console.log(`admin adduser admin=${adminId} target=${id} notified=${r.ok}`);
+    return;
+  }
+
+  if (cmd === '/ban') {
+    if (isAdmin(env, id)) {
+      await sendMessage(env, chatId, 'Администратора заблокировать нельзя. Уберите его из ADMIN_ID в wrangler.toml.');
+      return;
+    }
+    if (state === 'banned') {
+      await sendMessage(env, chatId, `<code>${id}</code> уже заблокирован.`);
+      return;
+    }
+    await setBanned(env.DB, id, true);
+    await sendMessage(env, chatId, `🚫 Доступ закрыт: <code>${id}</code>. Данные в базе остались, вернуть доступ можно командой <code>/unban ${id}</code>.`);
+    console.log(`admin ban admin=${adminId} target=${id}`);
+    return;
+  }
+
+  // /unban
+  if (state !== 'banned') {
+    await sendMessage(env, chatId, `<code>${id}</code> не заблокирован.`);
+    return;
+  }
+  await setBanned(env.DB, id, false);
+  const after = await getAccessState(env, id);
+  await sendMessage(
+    env,
+    chatId,
+    `✅ Блокировка снята: <code>${id}</code>.` +
+      (after === 'allowed' ? ' Доступ вернулся.' : ` Доступа по-прежнему нет: выдать его можно командой <code>/adduser ${id}</code>.`),
+  );
+  console.log(`admin unban admin=${adminId} target=${id} access=${after}`);
 }

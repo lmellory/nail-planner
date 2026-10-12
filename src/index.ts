@@ -13,6 +13,7 @@ import { expenses } from './api/expenses';
 import { prices } from './api/prices';
 import { importer } from './api/import';
 import { exporter } from './api/export';
+import { adminApi, me } from './api/admin';
 import { webhook } from './bot/webhook';
 import { runNotifications, runWeeklyBackups } from './cron';
 import { createTursoD1 } from './lib/turso';
@@ -38,8 +39,10 @@ app.use('/api/*', async (c, next) => {
   await next();
 });
 
-// API Mini App — только с валидной подписью Telegram и ID из ALLOWED_IDS
+// API Mini App — только с валидной подписью Telegram: мастера с доступом (ALLOWED_IDS, /adduser, минус /ban) и администраторы
 app.use('/api/*', authMiddleware);
+app.route('/api/me', me);
+app.route('/api/admin', adminApi);
 app.route('/api/appointments', appointments);
 app.route('/api/clients', clients);
 app.route('/api/notes', notes);

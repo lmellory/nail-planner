@@ -122,6 +122,22 @@ export async function getGlobalStats(db: D1Database, today: string, tomorrow: st
   };
 }
 
+/** Запоминает имя и @username пользователя (только если он уже есть в базе; нового пользователя не создаёт). */
+export async function saveUserName(db: D1Database, userId: number, name: string, username: string | null): Promise<void> {
+  await db
+    .prepare('UPDATE users SET display_name = ?, username = ? WHERE user_id = ? AND (display_name IS NOT ? OR username IS NOT ?)')
+    .bind(name || null, username, userId, name || null, username)
+    .run();
+}
+
+/** Имена пользователей для админ-панели: ID → {name, username}. Бросает исключение, если миграция 0014 не применена. */
+export async function getUserNames(db: D1Database): Promise<Map<number, { name: string | null; username: string | null }>> {
+  const r = await db
+    .prepare('SELECT user_id, display_name, username FROM users')
+    .all<{ user_id: number; display_name: string | null; username: string | null }>();
+  return new Map(r.results.map((x) => [Number(x.user_id), { name: x.display_name ?? null, username: x.username ?? null }]));
+}
+
 /** Применённые миграции: сколько и какая последняя (для /health). */
 export async function getMigrationsInfo(db: D1Database): Promise<{ count: number; latest: string | null }> {
   const r = await db
