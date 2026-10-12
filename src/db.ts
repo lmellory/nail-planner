@@ -18,6 +18,18 @@ export async function getUser(db: D1Database, userId: number): Promise<UserRow |
   return db.prepare('SELECT * FROM users WHERE user_id = ?').bind(userId).first<UserRow>();
 }
 
+/** Все пользователи в базе и число их записей (для команды администратора /export). */
+export async function listUsersOverview(db: D1Database): Promise<Array<{ user_id: number; appointments: number }>> {
+  const r = await db
+    .prepare(
+      `SELECT u.user_id AS user_id, COUNT(a.id) AS appointments
+       FROM users u LEFT JOIN appointments a ON a.user_id = u.user_id
+       GROUP BY u.user_id ORDER BY u.user_id`,
+    )
+    .all<{ user_id: number; appointments: number }>();
+  return r.results.map((x) => ({ user_id: Number(x.user_id), appointments: Number(x.appointments) }));
+}
+
 export async function ensureUser(db: D1Database, userId: number, tz: string): Promise<UserRow> {
   // notify_time задаём явно (а не через DEFAULT в схеме), чтобы значение по умолчанию жило в коде
   await db

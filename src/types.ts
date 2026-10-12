@@ -4,6 +4,7 @@ export interface Env {
   ASSETS: Fetcher;
   BOT_TOKEN: string;       // secret
   ALLOWED_IDS: string;     // secret: "123,456"
+  ADMIN_ID?: string;       // Telegram ID администратора (wrangler.toml [vars]); команда /export
   WEBHOOK_SECRET: string;  // secret
   TZ: string;              // wrangler.toml [vars]
   ENABLE_ID_COMMAND?: string;

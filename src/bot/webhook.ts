@@ -1,4 +1,4 @@
-// Обработка апдейтов Telegram (webhook). Команды: /start /menu /today /tomorrow /notify /id
+// Обработка апдейтов Telegram (webhook). Команды: /start /menu /today /tomorrow /notify /id; для администратора ещё /export
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { parseAllowedIds } from '../auth';
@@ -6,6 +6,7 @@ import { ensureUser, getDayNote, listAppointments } from '../db';
 import { addDays, nowInTz } from '../lib/time';
 import { formatDay } from '../lib/format';
 import { openAppKeyboard, sendMessage } from './telegram';
+import { handleExportCommand, isAdmin } from './admin';
 
 export const webhook = new Hono<{ Bindings: Env }>();
 
@@ -56,6 +57,12 @@ webhook.post('/', async (c) => {
     // /id отвечает всем (нужен, чтобы узнать свой ID). Можно отключить: ENABLE_ID_COMMAND="false"
     if (cmd === '/id' && c.env.ENABLE_ID_COMMAND !== 'false') {
       await sendMessage(c.env, msg.chat.id, `Твой ID: <code>${userId}</code>`);
+      return c.text('ok');
+    }
+
+    // Команды администратора (ADMIN_ID). Всем остальным бот на них молчит, как и чужим.
+    if (cmd === '/export') {
+      if (isAdmin(c.env, userId)) await handleExportCommand(c.env, msg.chat.id, userId, text.split(/\s+/)[1]);
       return c.text('ok');
     }
 
