@@ -39,6 +39,12 @@ export const sendMessage = (env: Env, chatId: number, text: string, extra: Recor
 export const deleteMessage = (env: Env, chatId: number, messageId: number) =>
   tg(env, 'deleteMessage', { chat_id: chatId, message_id: messageId });
 
+/** Данные бота (для проверки /health: токен рабочий, бот отвечает). */
+export const getMe = (env: Env) => tg(env, 'getMe', {});
+
+/** Состояние webhook: сколько апдейтов ждёт и последняя ошибка доставки (для /health). */
+export const getWebhookInfo = (env: Env) => tg(env, 'getWebhookInfo', {});
+
 /** Отправка файла документом в чат пользователя (multipart/form-data) */
 export async function sendDocument(
   env: Env,

@@ -1,4 +1,5 @@
-// Обработка апдейтов Telegram (webhook). Команды: /start /menu /today /tomorrow /notify /id; для администратора ещё /export
+// Обработка апдейтов Telegram (webhook). Команды: /start /menu /today /tomorrow /notify /id; для администратора ещё
+// /admin /users /user /stats /health /export /backupall /send /broadcast (см. admin.ts)
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { parseAllowedIds } from '../auth';
@@ -6,7 +7,7 @@ import { ensureUser, getDayNote, listAppointments } from '../db';
 import { addDays, nowInTz } from '../lib/time';
 import { formatDay } from '../lib/format';
 import { openAppKeyboard, sendMessage } from './telegram';
-import { handleExportCommand, isAdmin } from './admin';
+import { handleAdminCommand, isAdmin, isAdminCommand } from './admin';
 
 export const webhook = new Hono<{ Bindings: Env }>();
 
@@ -61,8 +62,9 @@ webhook.post('/', async (c) => {
     }
 
     // Команды администратора (ADMIN_ID). Всем остальным бот на них молчит, как и чужим.
-    if (cmd === '/export') {
-      if (isAdmin(c.env, userId)) await handleExportCommand(c.env, msg.chat.id, userId, text.split(/\s+/)[1]);
+    if (isAdminCommand(cmd)) {
+      // аргументы — всё после команды (в том числе после суффикса «@бот»)
+      if (isAdmin(c.env, userId)) await handleAdminCommand(c.env, msg.chat.id, userId, cmd, text.replace(/^\S+\s*/, ''));
       return c.text('ok');
     }
 
