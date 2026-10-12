@@ -14,6 +14,7 @@ export function timeLabel(a: Pick<Appointment, 'start_time'> & { end_time?: stri
 export function serviceLabel(a: Appointment): string {
   if (a.service === 'manicure') return `маникюр ${coat(a.manicure_coating)}`;
   if (a.service === 'pedicure') return `педикюр ${coat(a.pedicure_coating)}`;
+  if (a.service === 'manicure_fingers') return 'маникюр + пальцы';
   if (a.service === 'fingers') return 'пальцы';
   return `маникюр ${coat(a.manicure_coating)} + педикюр ${coat(a.pedicure_coating)}`;
 }

@@ -191,9 +191,9 @@ describe('настройки: прайс и бэкап', () => {
 
     setVal('#setting-price-manicure', '800');
     setVal('#setting-price-pedicure', '1200');
-    setVal('#setting-price-fingers', '300');
+    setVal('#setting-price-manicure_fingers', '300');
     click('#btn-save-prices');
-    await vi.waitFor(async () => expect(await calls(OWNER, '/api/prices')).toEqual({ manicure: 800, pedicure: 1200, both: null, fingers: 300 }), { timeout: 4000 });
+    await vi.waitFor(async () => expect(await calls(OWNER, '/api/prices')).toEqual({ manicure: 800, pedicure: 1200, both: null, manicure_fingers: 300, fingers: null }), { timeout: 4000 });
 
     $('#setting-backup-enabled').checked = false;
     click('#btn-save-settings');
@@ -223,7 +223,7 @@ describe('форма записи: цена из прайса и статус', 
     svc('both').click();
     expect($('#form-appt-price').value).toBe('999');   // вписанная вручную цена не затирается
     setVal('#form-appt-price', '');
-    svc('fingers').click();
+    svc('manicure_fingers').click();
     expect($('#form-appt-price').value).toBe('300');
   });
 
@@ -232,7 +232,7 @@ describe('форма записи: цена из прайса и статус', 
     click('#btn-submit-appt');
     await until(() => $('#screen-main').classList.contains('active'));
     const a = (await calls(OWNER, '/api/appointments?from=2026-10-14&to=2026-10-14')).find((x: any) => x.client_name === 'Тестовая');
-    expect(a).toMatchObject({ service: 'fingers', price: 300, status: 'scheduled' });
+    expect(a).toMatchObject({ service: 'manicure_fingers', price: 300, status: 'scheduled', manicure_coating: null, pedicure_coating: null });
   });
 
   it('пустая цена сохраняется как «не указана», дробная — блокируется до отправки', async () => {
