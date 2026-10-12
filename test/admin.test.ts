@@ -2,7 +2,7 @@
 // только для ADMIN_ID, остальным бот молчит.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
-import { ADMIN_COMMANDS, isAdmin, isAdminCommand } from '../src/bot/admin';
+import { ADMIN_COMMANDS, isAdmin, isAdminCommand, isViewer, VIEWER_COMMANDS } from '../src/bot/admin';
 import { api, createTestDb, makeEnv, NOW, OTHER, OWNER, stubTelegram, type TgCall } from './helpers/harness';
 
 let env: any;
@@ -355,5 +355,104 @@ describe('/broadcast', () => {
     await hook(OWNER, '/broadcast привет');
     expect(tg).toHaveLength(1);
     expect(tg[0].text).toContain('рассылать некому');
+  });
+});
+
+// ===== Наблюдатель (VIEWER_IDS): только смотреть записи =====
+
+const VIEWER = 777;
+
+describe('isViewer', () => {
+  it('список через запятую; пустой или отсутствующий — наблюдателей нет', () => {
+    expect(isViewer({ VIEWER_IDS: '352999678' }, 352999678)).toBe(true);
+    expect(isViewer({ VIEWER_IDS: '1, 352999678 ,3' }, 352999678)).toBe(true);
+    expect(isViewer({ VIEWER_IDS: '352999678' }, 5067848442)).toBe(false);
+    expect(isViewer({ VIEWER_IDS: '' }, 0)).toBe(false);
+    expect(isViewer({}, 352999678)).toBe(false);
+  });
+  it('наблюдателю доступны только /admin и /records', () => {
+    expect([...VIEWER_COMMANDS]).toEqual(['/admin', '/records']);
+  });
+});
+
+describe('/records', () => {
+  beforeEach(() => {
+    env.VIEWER_IDS = String(VIEWER); // наблюдателя нет ни в ALLOWED_IDS, ни в базе
+  });
+
+  it('наблюдатель получает один CSV со всеми записями всех мастеров (со столбцом «мастер»)', async () => {
+    await hook(VIEWER, '/records');
+    const docs = tg.filter((c) => c.method === 'sendDocument');
+    expect(docs).toHaveLength(1);
+    expect(docs[0].filename).toBe('nail-planner-all-2026-10-14.csv');
+    // BOM в сам файл пишется (buildCsv), но File.text() при чтении его отбрасывает, поэтому проверяем начало без него
+    expect(docs[0].file!.startsWith('мастер (ID);дата;')).toBe(true);
+    expect(docs[0].file).toContain(`${OWNER};2026-10-14;10:00;`);
+    expect(docs[0].file).toContain('Админская клиентка');
+    expect(docs[0].file).toContain(`${OTHER};2026-10-14;10:00;`);
+    expect(docs[0].file).toContain('Чужая клиентка');
+    expect(docs[0].caption).toContain('Все записи за всё время (2026-10-14): 2, мастеров: 2');
+  });
+
+  it('/records ID — только записи этого мастера, без столбца «мастер»', async () => {
+    await hook(VIEWER, `/records ${OTHER}`);
+    const docs = tg.filter((c) => c.method === 'sendDocument');
+    expect(docs).toHaveLength(1);
+    expect(docs[0].filename).toBe(`nail-planner-${OTHER}-2026-10-14.csv`);
+    expect(docs[0].file).toContain('Чужая клиентка');
+    expect(docs[0].file).not.toContain('Админская клиентка');
+    expect(docs[0].file).not.toContain('мастер (ID)');
+  });
+
+  it('кривой и неизвестный ID — сообщение, файла нет; суффикс бота работает', async () => {
+    await hook(VIEWER, '/records abc');
+    await hook(VIEWER, '/records 999999');
+    expect(tg.filter((c) => c.method === 'sendDocument')).toHaveLength(0);
+    expect(tg[0].text).toContain('Некорректный ID');
+    expect(tg[1].text).toContain('не найден');
+    tg.length = 0;
+    await hook(VIEWER, '/records@mybot');
+    expect(tg.filter((c) => c.method === 'sendDocument')).toHaveLength(1);
+  });
+
+  it('записей нет вообще — сообщение вместо пустого файла', async () => {
+    await env.DB.prepare('DELETE FROM appointments').run();
+    await hook(VIEWER, '/records');
+    expect(tg).toHaveLength(1);
+    expect(tg[0].text).toContain('Записей пока нет');
+  });
+
+  it('администратору /records тоже доступен', async () => {
+    await hook(OWNER, '/records');
+    expect(tg.filter((c) => c.method === 'sendDocument')).toHaveLength(1);
+  });
+
+  it('/admin у наблюдателя показывает только его команды', async () => {
+    await hook(VIEWER, '/admin');
+    expect(tg).toHaveLength(1);
+    expect(tg[0].text).toContain('/records');
+    for (const c of ['/broadcast', '/send', '/backupall', '/export', '/users']) expect(tg[0].text).not.toContain(c);
+  });
+
+  it('все остальные команды администратора наблюдателю недоступны: бот молчит', async () => {
+    for (const text of ['/users', '/user 111', '/stats', '/health', '/export', `/export ${OTHER}`, '/backupall', '/send 111 привет', '/broadcast привет']) {
+      expect((await hook(VIEWER, text)).status).toBe(200);
+    }
+    expect(tg).toHaveLength(0);
+  });
+
+  it('не наблюдатель и не админ (мастер, посторонний) /records не получает; без VIEWER_IDS наблюдателя нет', async () => {
+    await hook(OTHER, '/records');
+    await hook(333, '/records');
+    env.VIEWER_IDS = undefined;
+    await hook(VIEWER, '/records');
+    expect(tg).toHaveLength(0);
+  });
+
+  it('наблюдатель ничего не меняет: количество записей до и после одинаково', async () => {
+    const count = async () => Number((await env.DB.prepare('SELECT COUNT(*) AS n FROM appointments').first()).n);
+    const before = await count();
+    for (const text of ['/records', `/records ${OTHER}`, '/broadcast привет', '/send 111 привет']) await hook(VIEWER, text);
+    expect(await count()).toBe(before);
   });
 });

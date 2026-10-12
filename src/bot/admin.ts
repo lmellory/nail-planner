@@ -8,13 +8,16 @@
 //   /stats            — сводка по всей базе
 //   /health           — проверка базы, бота и webhook
 //   /export [ID]      — список пользователей / CSV и JSON-копия данных пользователя
+//   /records [ID]     — CSV (для Excel) со всеми записями за всё время: всех мастеров или одного
 //   /backupall        — JSON-копии данных всех пользователей
 //   /send ID текст    — сообщение одному пользователю
 //   /broadcast текст  — сообщение всем мастерам из ALLOWED_IDS
+// Наблюдатели (VIEWER_IDS) могут только /records (и /admin со своим списком): смотреть и выгружать записи.
 // Разрушающих команд (удаление данных, смена доступа) нет намеренно: доступ задаётся секретом ALLOWED_IDS.
-import type { Env } from '../types';
+import type { Appointment, Env } from '../types';
 import {
   getAllAppointments,
+  getEveryAppointment,
   getGlobalStats,
   getMigrationsInfo,
   getUser,
@@ -36,6 +39,13 @@ export function isAdmin(env: Pick<Env, 'ADMIN_ID'>, userId: number): boolean {
   return Number.isInteger(id) && id > 0 && id === userId;
 }
 
+/** true, если userId есть в VIEWER_IDS (список через запятую). Наблюдатель только смотрит записи. */
+export function isViewer(env: Pick<Env, 'VIEWER_IDS'>, userId: number): boolean {
+  return parseAllowedIds(env.VIEWER_IDS ?? '').includes(userId);
+}
+
+export type StaffRole = 'admin' | 'viewer';
+
 /** Все команды администратора (с «/»). Остальным бот на них не отвечает. */
 export const ADMIN_COMMANDS = [
   '/admin',
@@ -44,12 +54,17 @@ export const ADMIN_COMMANDS = [
   '/stats',
   '/health',
   '/export',
+  '/records',
   '/backupall',
   '/send',
   '/broadcast',
 ] as const;
 
 export const isAdminCommand = (cmd: string): boolean => (ADMIN_COMMANDS as readonly string[]).includes(cmd);
+
+/** Команды, доступные наблюдателю. */
+export const VIEWER_COMMANDS = ['/admin', '/records'] as const;
+export const isViewerCommand = (cmd: string): boolean => (VIEWER_COMMANDS as readonly string[]).includes(cmd);
 
 /** Максимальная длина текста для /send и /broadcast (лимит Telegram — 4096 с учётом заголовка). */
 export const MAX_ANNOUNCE_LENGTH = 3500;
@@ -64,10 +79,18 @@ const HELP =
   '/health — проверка базы, бота и webhook\n' +
   '/export — список пользователей для выгрузки\n' +
   '/export <code>ID</code> — CSV и JSON-копия данных пользователя\n' +
+  '/records — все записи всех мастеров за всё время (CSV для Excel)\n' +
+  '/records <code>ID</code> — все записи одного мастера\n' +
   '/backupall — JSON-копии всех пользователей\n' +
   '/send <code>ID текст</code> — сообщение одному пользователю\n' +
   '/broadcast <code>текст</code> — сообщение всем мастерам из ALLOWED_IDS';
 
+const VIEWER_HELP =
+  '👁 <b>Команды наблюдателя</b>\n\n' +
+  '/records — все записи всех мастеров за всё время (файл CSV, открывается в Excel)\n' +
+  '/records <code>ID</code> — все записи одного мастера';
+
+const USAGE_RECORDS = 'Использование: <code>/records</code> или <code>/records ID</code>, например <code>/records 123456789</code>.';
 const USAGE_EXPORT = 'Использование: <code>/export ID</code>, например <code>/export 123456789</code>.';
 const USAGE_USER = 'Использование: <code>/user ID</code>, например <code>/user 123456789</code>.';
 const USAGE_SEND = 'Использование: <code>/send ID текст</code>, например <code>/send 123456789 Привет!</code>';
@@ -88,12 +111,23 @@ const formatWorkDays = (s?: string | null) => {
  * Точка входа: разбирает команду администратора. Вызывать только после isAdmin().
  * args — всё, что написано после команды (без лишних пробелов по краям).
  */
-export async function handleAdminCommand(env: Env, chatId: number, adminId: number, cmd: string, args: string): Promise<void> {
+export async function handleAdminCommand(
+  env: Env,
+  chatId: number,
+  adminId: number,
+  cmd: string,
+  args: string,
+  role: StaffRole = 'admin',
+): Promise<void> {
+  // Наблюдатель: только свои команды (вторая линия защиты, помимо проверки в webhook)
+  if (role === 'viewer' && !isViewerCommand(cmd)) return;
   const arg = args.trim();
   switch (cmd) {
     case '/admin':
-      await sendMessage(env, chatId, HELP);
+      await sendMessage(env, chatId, role === 'viewer' ? VIEWER_HELP : HELP);
       return;
+    case '/records':
+      return handleRecordsCommand(env, chatId, adminId, arg.split(/\s+/)[0] || undefined);
     case '/users':
       return handleUsersCommand(env, chatId);
     case '/user':
@@ -387,4 +421,49 @@ export async function handleBroadcastCommand(env: Env, chatId: number, adminId: 
   if (failed.length) report += `\n❌ Не удалось: ${failed.map((id) => `<code>${id}</code>`).join(', ')}`;
   await sendMessage(env, chatId, report);
   console.log(`admin broadcast admin=${adminId} recipients=${recipients.length} sent=${sent} blocked=${blocked.length} failed=${failed.length}`);
+}
+
+/**
+ * /records — все записи всех мастеров за всё время одним файлом CSV (UTF-8 с BOM, «;»: открывается в Excel).
+ * /records ID — записи одного мастера. Только просмотр: ничего не меняет. Доступно администратору и наблюдателям.
+ */
+export async function handleRecordsCommand(env: Env, chatId: number, viewerId: number, arg?: string): Promise<void> {
+  const { date } = nowInTz(env.TZ);
+  let items: Appointment[];
+  let filename: string;
+  let caption: string;
+
+  if (!arg) {
+    items = await getEveryAppointment(env.DB);
+    const masters = new Set(items.map((a) => a.user_id)).size;
+    filename = `nail-planner-all-${date}.csv`;
+    caption = `📊 Все записи за всё время (${date}): ${items.length}, мастеров: ${masters}`;
+  } else {
+    if (!isId(arg)) {
+      await sendMessage(env, chatId, `Некорректный ID.\n${USAGE_RECORDS}`);
+      return;
+    }
+    const targetId = Number(arg);
+    if (!(await getUser(env.DB, targetId))) {
+      await sendMessage(env, chatId, `Мастер <code>${targetId}</code> не найден в базе.`);
+      return;
+    }
+    items = await getAllAppointments(env.DB, targetId);
+    filename = `nail-planner-${targetId}-${date}.csv`;
+    caption = `📊 Записи мастера ${targetId} (${date}): ${items.length}`;
+  }
+
+  if (!items.length) {
+    await sendMessage(env, chatId, 'Записей пока нет.');
+    return;
+  }
+  const r = await sendDocument(
+    env,
+    chatId,
+    new Blob([buildCsv(items, { withUser: !arg })], { type: 'text/csv; charset=utf-8' }),
+    filename,
+    caption,
+  );
+  if (!r.ok) await sendMessage(env, chatId, 'Не удалось отправить файл в Telegram, попробуйте ещё раз.');
+  console.log(`records viewer=${viewerId} target=${arg ?? 'all'} appointments=${items.length} ok=${r.ok}`);
 }
