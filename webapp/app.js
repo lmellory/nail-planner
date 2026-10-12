@@ -75,12 +75,6 @@ function minutesToTime(mins) {
   return `${pad(h)}:${pad(m)}`;
 }
 
-function addMinutes(timeStr, minutes) {
-  if (!timeStr) return '';
-  const total = timeToMinutes(timeStr) + minutes;
-  return minutesToTime(total);
-}
-
 function formatApptTime(a) {
   if (!a) return '';
   return a.start_time;
@@ -515,6 +509,17 @@ async function loadFreeSlots(dateStr) {
   }
 }
 
+const STATUS_RU = { no_show: 'Не пришла', cancelled: 'Отменена' };
+const statusBadgeHtml = (a) => (STATUS_RU[a.status] ? `<span class="appt-status-badge is-${a.status}">${STATUS_RU[a.status]}</span>` : '');
+const inactiveClass = (a) => (STATUS_RU[a.status] ? ' is-inactive' : '');
+
+function plural(n, one, few, many) {
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  return b === 1 ? one : many;
+}
+
 function renderAppointmentsList() {
   const listEl = document.getElementById('appointments-list');
   if (!listEl) return;
@@ -533,7 +538,7 @@ function renderAppointmentsList() {
   listEl.innerHTML = '';
   for (const a of state.appointments) {
     const card = document.createElement('div');
-    card.className = 'appointment-card';
+    card.className = 'appointment-card' + inactiveClass(a);
     card.setAttribute('data-id', a.id);
 
     const whoHtml = a.who ? `<span class="appt-card-who">${escapeHtml(a.who)}</span>` : '';
@@ -560,6 +565,7 @@ function renderAppointmentsList() {
     card.innerHTML = `
       <div class="appt-card-top">
         <span class="appt-card-time">🕐 ${formatApptTime(a)}</span>
+        ${statusBadgeHtml(a)}
         ${a.price != null ? `<span class="appt-card-price">${formatMoney(a.price)}</span>` : ''}
       </div>
       <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
@@ -585,6 +591,13 @@ function escapeHtml(s) {
 // ===== 3. ФОРМА ЗАПИСИ (СОЗДАНИЕ / РЕДАКТИРОВАНИЕ) =====
 
 let selectedService = 'manicure';
+let selectedStatus = 'scheduled'; // scheduled | no_show | cancelled
+
+function updateStatusUI() {
+  document.querySelectorAll('#status-selector .segment-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.status === selectedStatus);
+  });
+}
 let manicureCoating = 'gel';
 let pedicureCoating = 'gel';
 
@@ -615,6 +628,8 @@ function openForm(appt = null) {
     if (commentInput) commentInput.value = appt.comment || '';
     if (priceInput) priceInput.value = appt.price ?? '';
     selectedService = appt.service || 'manicure';
+    selectedStatus = appt.status || 'scheduled';
+    updateStatusUI();
     manicureCoating = appt.manicure_coating || 'gel';
     pedicureCoating = appt.pedicure_coating || 'gel';
     if (deleteBtn) deleteBtn.style.display = 'block';
@@ -641,6 +656,8 @@ function openForm(appt = null) {
     if (commentInput) commentInput.value = '';
     if (priceInput) priceInput.value = state.prices.manicure ?? '';
     selectedService = 'manicure';
+    selectedStatus = 'scheduled';
+    updateStatusUI();
     manicureCoating = 'gel';
     pedicureCoating = 'gel';
     if (deleteBtn) deleteBtn.style.display = 'none';
@@ -721,6 +738,16 @@ function autofillPrice(prevService) {
   const prevAuto = state.prices[prevService] != null ? String(state.prices[prevService]) : '';
   if (cur === '' || cur === prevAuto) el.value = state.prices[selectedService] ?? '';
 }
+
+// Выбор статуса записи
+document.querySelectorAll('#status-selector .segment-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    haptic('light');
+    selectedStatus = btn.dataset.status;
+    updateStatusUI();
+    checkConflicts();
+  });
+});
 
 // Нажатия на кнопки переключения услуг и покрытий
 document.querySelectorAll('#service-selector .segment-btn').forEach((btn) => {
@@ -826,6 +853,7 @@ async function saveAppointment() {
     pedicure_coating: (selectedService === 'pedicure' || selectedService === 'both') ? pedicureCoating : null,
     comment,
     price,
+    status: selectedStatus,
   };
 
   try {
@@ -1100,7 +1128,7 @@ function renderSearchResults(items) {
   resultsEl.innerHTML = '';
   for (const a of items) {
     const card = document.createElement('div');
-    card.className = 'appointment-card';
+    card.className = 'appointment-card' + inactiveClass(a);
 
     let serviceRu = 'Маникюр';
     if (a.service === 'pedicure') serviceRu = 'Педикюр';
@@ -1112,6 +1140,7 @@ function renderSearchResults(items) {
     card.innerHTML = `
       <div class="appt-card-top">
         <span class="appt-card-time">📅 ${formatFullDateRu(a.date)} · ${formatApptTime(a)}</span>
+        ${statusBadgeHtml(a)}
       </div>
       <div class="appt-card-client">${escapeHtml(a.client_name)}</div>
       ${whoHtml}
@@ -1293,6 +1322,50 @@ async function saveSettings() {
     console.error('Ошибка сохранения настроек:', err);
   }
 }
+
+// ===== ВОССТАНОВЛЕНИЕ ИЗ РЕЗЕРВНОЙ КОПИИ =====
+async function restoreFromFile(file) {
+  let backup;
+  try {
+    backup = JSON.parse(await file.text());
+  } catch {
+    return showToast('Файл не похож на резервную копию');
+  }
+  let preview;
+  try {
+    preview = await api('/import', { method: 'POST', body: JSON.stringify({ backup }) }); // только проверка
+  } catch {
+    return; // api() уже показал причину
+  }
+  const r = preview.report;
+  const skipped = r.appointments.skipped + r.clients.skipped + r.expenses.skipped + r.day_notes.skipped;
+  const message =
+    `Восстановить из копии?\n\nЗаписей: ${r.appointments.ok}\nКлиентов: ${r.clients.ok}\nТрат: ${r.expenses.ok}\nЗаметок: ${r.day_notes.ok}` +
+    (skipped ? `\nПропущено повреждённых строк: ${skipped}` : '') +
+    `\n\nВсе текущие данные будут заменены.`;
+  confirmDialog(message, async (confirmed) => {
+    if (!confirmed) return;
+    try {
+      await api('/import', { method: 'POST', body: JSON.stringify({ backup, confirm: true }) });
+      haptic('success');
+      showToast('Данные восстановлены ✅');
+      await Promise.all([loadWeekSummary(), loadSelectedDay(), loadClientsDatalist().catch(() => {}), loadPrices().catch(() => {})]);
+      await openSettings();
+    } catch (err) {
+      console.error('Ошибка восстановления:', err);
+    }
+  });
+}
+
+document.getElementById('btn-restore-backup')?.addEventListener('click', () => {
+  haptic('light');
+  document.getElementById('restore-file-input')?.click();
+});
+document.getElementById('restore-file-input')?.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = ''; // чтобы тот же файл можно было выбрать повторно
+  if (file) restoreFromFile(file);
+});
 
 // ===== ПРАЙС УСЛУГ =====
 const PRICE_SERVICES = ['manicure', 'pedicure', 'both', 'fingers'];
@@ -1842,6 +1915,21 @@ function renderIncomeSummary() {
     noteEl.style.display = 'block';
   } else {
     noteEl.style.display = 'none';
+  }
+
+  const extraEl = document.getElementById('income-extra');
+  if (extraEl) {
+    const lines = [];
+    if (d.expected > 0) {
+      lines.push(`⏳ Ожидается: ${formatMoney(d.expected)} (${d.expected_count} ${plural(d.expected_count, 'запись', 'записи', 'записей')})`);
+    }
+    const missed = (d.no_show || 0) + (d.cancelled || 0);
+    if (missed > 0) {
+      lines.push(`⚠️ Сорвалось записей: ${missed} (не пришли — ${d.no_show}, отменили — ${d.cancelled})`);
+    }
+    extraEl.innerHTML = '';
+    lines.forEach((t) => { const div = document.createElement('div'); div.textContent = t; extraEl.appendChild(div); });
+    extraEl.style.display = lines.length ? 'block' : 'none';
   }
 
   renderIncomeMaterials(d);

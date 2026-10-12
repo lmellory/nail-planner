@@ -2,7 +2,11 @@
 import { createClient, type Client } from '@libsql/client/web';
 
 export function createTursoD1(url: string, authToken: string): D1Database {
-  const client: Client = createClient({ url, authToken });
+  return createD1FromClient(createClient({ url, authToken }));
+}
+
+/** Оборачивает любой клиент libSQL в D1-совместимый интерфейс (в тестах — клиент на локальном файле). */
+export function createD1FromClient(client: Pick<Client, 'execute' | 'batch' | 'executeMultiple'>): D1Database {
 
   class TursoPreparedStatement implements D1PreparedStatement {
     constructor(

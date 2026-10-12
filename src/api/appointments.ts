@@ -17,6 +17,7 @@ import { addMinutes, defaultServiceDuration, isDate, isTime } from '../lib/time'
 import { escapeHtml, sendMessage } from '../bot/telegram';
 import { parseAmount } from '../lib/money';
 import { SERVICES } from '../lib/services';
+import { isStatus } from '../lib/status';
 import { serviceLabel, timeLabel } from '../lib/format';
 
 export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
@@ -47,6 +48,9 @@ export function validate(b: any) {
   const price = parseAmount(b?.price);
   if (price === undefined) return [null, 'Цена: целое число от 0 до 10 000 000'] as const;
 
+  const status = b?.status === undefined || b?.status === null ? 'scheduled' : b.status;
+  if (!isStatus(status)) return [null, 'Некорректный статус'] as const;
+
   return [{
     date: b.date as string,
     start_time: b.start_time as string,
@@ -58,6 +62,7 @@ export function validate(b: any) {
     pedicure_coating: pc as 'gel' | 'none' | null,
     comment: b.comment ? String(b.comment).slice(0, 1000) : null,
     price,
+    status,
   }, null] as const;
 }
 

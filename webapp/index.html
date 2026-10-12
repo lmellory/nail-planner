@@ -228,6 +228,17 @@
             <input type="number" id="form-appt-price" class="form-input" inputmode="numeric" min="0" max="10000000" step="1" placeholder="Например: 800">
           </div>
 
+          <!-- Статус -->
+          <div class="form-group">
+            <label>Статус</label>
+            <div class="segmented-control" id="status-selector">
+              <button type="button" class="segment-btn active" data-status="scheduled">Запланирована</button>
+              <button type="button" class="segment-btn" data-status="no_show">Не пришла</button>
+              <button type="button" class="segment-btn" data-status="cancelled">Отменена</button>
+            </div>
+            <span class="field-hint">«Не пришла» и «Отменена» освобождают время и не входят в доход</span>
+          </div>
+
           <!-- Комментарий -->
           <div class="form-group">
             <label for="form-appt-comment">Комментарий к записи</label>
@@ -439,6 +450,14 @@
                 <small>Все записи с датами, временем, клиентами и услугами</small>
               </div>
             </button>
+            <button type="button" class="btn-export" id="btn-restore-backup">
+              <span class="export-btn-icon">♻️</span>
+              <div class="export-btn-text">
+                <strong>Восстановить из копии (JSON)</strong>
+                <small>Выбери файл копии: текущие данные будут заменены его содержимым</small>
+              </div>
+            </button>
+            <input type="file" id="restore-file-input" accept=".json,application/json" style="display: none;">
             <button type="button" class="btn-export" id="btn-export-json">
               <span class="export-btn-icon">💾</span>
               <div class="export-btn-text">
@@ -488,6 +507,8 @@
           <div class="income-total-value" id="income-total-value">—</div>
           <div class="income-delta" id="income-delta"></div>
         </div>
+
+        <div class="income-extra" id="income-extra" style="display: none;"></div>
 
         <div class="income-chart-card">
           <div class="income-chart" id="income-chart"></div>

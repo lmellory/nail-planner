@@ -53,7 +53,7 @@ export async function findConflicts(
   const r = await db
     .prepare(
       `SELECT * FROM appointments
-       WHERE user_id = ? AND date = ? AND id != ?
+       WHERE user_id = ? AND date = ? AND id != ? AND status = 'scheduled'
          AND (
            (end_time IS NOT NULL AND start_time < ? AND end_time > ?)
            OR
@@ -73,7 +73,7 @@ export async function insertAppointment(
   const res = await db
     .prepare(
       `INSERT INTO appointments (user_id, date, start_time, end_time, client_name, who, service,
-         manicure_coating, pedicure_coating, comment, price) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+         manicure_coating, pedicure_coating, comment, price, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .bind(
       userId,
@@ -87,6 +87,7 @@ export async function insertAppointment(
       data.pedicure_coating,
       data.comment,
       data.price ?? null,
+      data.status ?? 'scheduled',
     )
     .run();
   return res.meta.last_row_id as number;
@@ -101,7 +102,7 @@ export async function updateAppointment(
   const res = await db
     .prepare(
       `UPDATE appointments SET date=?, start_time=?, end_time=?, client_name=?, who=?, service=?,
-         manicure_coating=?, pedicure_coating=?, comment=?, price=?, updated_at=datetime('now')
+         manicure_coating=?, pedicure_coating=?, comment=?, price=?, status=?, updated_at=datetime('now')
        WHERE user_id=? AND id=?`,
     )
     .bind(
@@ -115,6 +116,7 @@ export async function updateAppointment(
       data.pedicure_coating,
       data.comment,
       data.price ?? null,
+      data.status ?? 'scheduled',
       userId,
       id,
     )
@@ -122,18 +124,65 @@ export async function updateAppointment(
   return (res.meta.changes ?? 0) > 0;
 }
 
-/** Доходы по дням за период: сумма цен, число записей с ценой и без неё. */
-export async function getIncomeByDay(db: D1Database, userId: number, from: string, to: string): Promise<DayRow[]> {
+/** Условие «запись состоялась к моменту now»: живая и её начало уже наступило. Параметры: nowDate, nowDate, nowTime. */
+const HELD_SQL = "status = 'scheduled' AND (date < ? OR (date = ? AND start_time <= ?))";
+
+/** Доходы по дням за период — только состоявшиеся записи: сумма цен, число записей с ценой и без неё. */
+export async function getIncomeByDay(
+  db: D1Database,
+  userId: number,
+  from: string,
+  to: string,
+  nowDate: string,
+  nowTime: string,
+): Promise<DayRow[]> {
   const r = await db
     .prepare(
       `SELECT date, COALESCE(SUM(price), 0) AS sum, COUNT(price) AS paid, COUNT(*) - COUNT(price) AS unpaid
        FROM appointments
-       WHERE user_id = ? AND date >= ? AND date <= ?
+       WHERE user_id = ? AND date >= ? AND date <= ? AND ${HELD_SQL}
        GROUP BY date`,
     )
-    .bind(userId, from, to)
+    .bind(userId, from, to, nowDate, nowDate, nowTime)
     .all<DayRow>();
   return r.results;
+}
+
+/** Ожидаемый доход: будущие живые записи с ценой в периоде. */
+export async function getExpectedIncome(
+  db: D1Database,
+  userId: number,
+  from: string,
+  to: string,
+  nowDate: string,
+  nowTime: string,
+): Promise<{ sum: number; count: number }> {
+  const r = await db
+    .prepare(
+      `SELECT COALESCE(SUM(price), 0) AS sum, COUNT(price) AS count
+       FROM appointments
+       WHERE user_id = ? AND date >= ? AND date <= ? AND status = 'scheduled'
+         AND NOT (date < ? OR (date = ? AND start_time <= ?))`,
+    )
+    .bind(userId, from, to, nowDate, nowDate, nowTime)
+    .first<{ sum: number; count: number }>();
+  return { sum: Number(r?.sum) || 0, count: Number(r?.count) || 0 };
+}
+
+/** Сколько записей в периоде по статусам (для «сорвалось записей»). */
+export async function getStatusCounts(
+  db: D1Database,
+  userId: number,
+  from: string,
+  to: string,
+): Promise<Record<string, number>> {
+  const r = await db
+    .prepare(
+      'SELECT status, COUNT(*) AS count FROM appointments WHERE user_id = ? AND date >= ? AND date <= ? GROUP BY status',
+    )
+    .bind(userId, from, to)
+    .all<{ status: string; count: number }>();
+  return Object.fromEntries(r.results.map((x) => [x.status, Number(x.count)]));
 }
 
 export async function deleteAppointment(db: D1Database, userId: number, id: number): Promise<boolean> {
@@ -233,7 +282,7 @@ export async function listClients(db: D1Database, userId: number, search?: strin
            MAX(a.date) as last_visit,
            MIN(CASE WHEN a.date >= date('now') THEN a.date ELSE NULL END) as next_visit
     FROM clients c
-    LEFT JOIN appointments a ON a.user_id = c.user_id AND a.client_name = c.name
+    LEFT JOIN appointments a ON a.user_id = c.user_id AND a.client_name = c.name AND a.status = 'scheduled'
     WHERE c.user_id = ?
   `;
   const params: any[] = [userId];
@@ -335,7 +384,7 @@ export async function getDaySummary(
 ): Promise<{ date: string; count: number; has_note: boolean }[]> {
   const a = await db
     .prepare(
-      'SELECT date, COUNT(*) AS count FROM appointments WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY date',
+      "SELECT date, COUNT(*) AS count FROM appointments WHERE user_id=? AND date BETWEEN ? AND ? AND status='scheduled' GROUP BY date",
     )
     .bind(userId, from, to)
     .all<{ date: string; count: number }>();

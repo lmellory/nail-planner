@@ -2,6 +2,7 @@
 import type { Appointment } from '../types';
 import { escapeHtml } from '../bot/telegram';
 import { weekdayRu } from './time';
+import { isActiveStatus } from './status';
 
 const coat = (c: string | null) => (c === 'gel' ? 'с покрытием' : 'без покрытия');
 
@@ -28,6 +29,7 @@ export function formatDay(
   note?: string,
   clientContacts?: Map<string, ClientContactInfo>,
 ): string {
+  items = items.filter((a) => isActiveStatus(a.status)); // отменённые и неявки в расписание не попадают
   const [y, m, d] = date.split('-');
   let out = `<b>📅 ${d}.${m}.${y}, ${weekdayRu(date)}</b>\n`;
   if (!items.length) {

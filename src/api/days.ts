@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
 import { addMinutes, calculateFreeSlots, defaultServiceDuration, isDate } from '../lib/time';
 import { ensureUser, getDaySummary, getUser, listAppointments } from '../db';
+import { isActiveStatus } from '../lib/status';
 
 export const days = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
@@ -38,7 +39,7 @@ days.get('/slots', async (c) => {
     });
   }
 
-  const appts = await listAppointments(c.env.DB, userId, date, date);
+  const appts = (await listAppointments(c.env.DB, userId, date, date)).filter((a) => isActiveStatus(a.status));
   const busy = appts.map((a) => ({
     start: a.start_time,
     end: a.end_time || addMinutes(a.start_time, defaultServiceDuration(a.service)),

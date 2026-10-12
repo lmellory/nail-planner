@@ -4,6 +4,7 @@ import type { Appointment, AppVars, Env, Expense } from '../types';
 import { ensureUser, getAllAppointments, listAppointments, listExpenses } from '../db';
 import { buildJsonBackup } from '../lib/backup';
 import { isPeriod, periodRange } from '../lib/stats';
+import { isHeld, STATUS_LABELS_RU } from '../lib/status';
 import { sendDocument } from '../bot/telegram';
 import { isDate, nowInTz } from '../lib/time';
 
@@ -46,7 +47,7 @@ function coatingLabel(service: string, manicureCoating: string | null, pedicureC
 }
 
 export function buildCsv(items: Appointment[]): string {
-  const header = ['дата', 'начало', 'конец', 'имя', 'кто это', 'услуга', 'покрытие', 'цена', 'комментарий'];
+  const header = ['дата', 'начало', 'конец', 'имя', 'кто это', 'услуга', 'покрытие', 'цена', 'статус', 'комментарий'];
   const lines = [
     header.map(csvEscape).join(';'),
     ...items.map((a) =>
@@ -59,6 +60,7 @@ export function buildCsv(items: Appointment[]): string {
         serviceLabelRu(a.service),
         coatingLabel(a.service, a.manicure_coating, a.pedicure_coating),
         a.price ?? '',
+        STATUS_LABELS_RU[a.status] ?? a.status ?? '',
         a.comment ?? '',
       ]
         .map(csvEscape)
@@ -197,7 +199,8 @@ exporter.post('/finance', async (c) => {
   if (!isPeriod(body?.period)) return c.json({ error: 'period: week | month | year' }, 400);
 
   const u = await ensureUser(c.env.DB, userId, c.env.TZ);
-  const date = body.date === undefined ? nowInTz(u.tz).date : body.date;
+  const now = nowInTz(u.tz);
+  const date = body.date === undefined ? now.date : body.date;
   if (!isDate(date)) return c.json({ error: 'Некорректная дата' }, 400);
 
   const { from, to } = periodRange(body.period, date);
@@ -205,11 +208,13 @@ exporter.post('/finance', async (c) => {
     listAppointments(c.env.DB, userId, from, to),
     listExpenses(c.env.DB, userId, from, to, 10000),
   ]);
+  // Как и на экране «Доходы»: в доход идут только состоявшиеся записи (не отменённые и уже начавшиеся)
+  const held = appointments.filter((a) => isHeld(a, now.date, now.time));
   const filename = `nail-planner-finance-${from}_${to}.csv`;
   const res = await sendDocument(
     c.env,
     userId,
-    new Blob([buildFinanceCsv(appointments, expenses)], { type: 'text/csv; charset=utf-8' }),
+    new Blob([buildFinanceCsv(held, expenses)], { type: 'text/csv; charset=utf-8' }),
     filename,
     `📊 Доходы и траты: ${from} — ${to}`,
   );

@@ -83,6 +83,24 @@ describe('validate appointment input', () => {
     });
   });
 
+  describe('статус', () => {
+    const base = { date: '2026-10-15', start_time: '10:00', client_name: 'Инна', service: 'fingers' };
+
+    it('по умолчанию scheduled', () => {
+      expect(validate(base)[0]?.status).toBe('scheduled');
+      expect(validate({ ...base, status: null })[0]?.status).toBe('scheduled');
+    });
+    it('принимает no_show и cancelled', () => {
+      expect(validate({ ...base, status: 'no_show' })[0]?.status).toBe('no_show');
+      expect(validate({ ...base, status: 'cancelled' })[0]?.status).toBe('cancelled');
+    });
+    it('отклоняет неизвестный статус', () => {
+      const [d, err] = validate({ ...base, status: 'done' });
+      expect(d).toBeNull();
+      expect(err).toContain('статус');
+    });
+  });
+
   it('сохраняет переданный явный end_time, если он корректен', () => {
     const input = {
       date: '2026-10-15',

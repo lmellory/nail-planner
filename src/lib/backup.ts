@@ -8,6 +8,9 @@ import {
   getServicePrices,
 } from '../db';
 
+export const BACKUP_FORMAT = 'nail-planner-backup';
+export const BACKUP_VERSION = 2;
+
 export async function buildJsonBackup(db: D1Database, userId: number, fallbackTz: string): Promise<string> {
   const u = await ensureUser(db, userId, fallbackTz);
   const [appointments, clients, expenses, day_notes, prices] = await Promise.all([
@@ -29,8 +32,8 @@ export async function buildJsonBackup(db: D1Database, userId: number, fallbackTz
   };
   return JSON.stringify(
     {
-      format: 'nail-planner-backup',
-      version: 2,
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
       exported_at: new Date().toISOString(),
       appointments,
       clients,

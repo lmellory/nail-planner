@@ -52,6 +52,17 @@ export interface IncomeReport {
   prev_expense: number;
   profit: number;     // доход минус траты
   materials: MaterialRow[]; // траты по материалам, самые большие сверху
+  expected: number;       // ожидаемый доход: будущие записи с ценой
+  expected_count: number;
+  no_show: number;        // записей «не пришла» в периоде
+  cancelled: number;      // записей «отменена» в периоде
+}
+
+export interface IncomeExtras {
+  expected: number;
+  expected_count: number;
+  no_show: number;
+  cancelled: number;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -129,6 +140,7 @@ export function buildIncomeReport(
   expenseRows: ExpenseDayRow[] = [],
   prevExpenseRows: ExpenseDayRow[] = [],
   materials: MaterialRow[] = [],
+  extras: Partial<IncomeExtras> = {},
 ): IncomeReport {
   const buckets = buildBuckets(period, from, to, rows, expenseRows);
   const total = buckets.reduce((s, b) => s + b.sum, 0);
@@ -145,5 +157,9 @@ export function buildIncomeReport(
     total_expense, expense_count, prev_expense,
     profit: total - total_expense,
     materials: materials.map((m) => ({ name: m.name, sum: Number(m.sum) || 0, count: Number(m.count) || 0 })),
+    expected: extras.expected ?? 0,
+    expected_count: extras.expected_count ?? 0,
+    no_show: extras.no_show ?? 0,
+    cancelled: extras.cancelled ?? 0,
   };
 }

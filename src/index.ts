@@ -11,6 +11,7 @@ import { settings } from './api/settings';
 import { stats } from './api/stats';
 import { expenses } from './api/expenses';
 import { prices } from './api/prices';
+import { importer } from './api/import';
 import { exporter } from './api/export';
 import { webhook } from './bot/webhook';
 import { runNotifications, runWeeklyBackups } from './cron';
@@ -48,6 +49,7 @@ app.route('/api/settings', settings);
 app.route('/api/stats', stats);
 app.route('/api/expenses', expenses);
 app.route('/api/prices', prices);
+app.route('/api/import', importer);
 app.route('/api/export', exporter);
 
 app.onError((err, c) => {

@@ -16,15 +16,11 @@ import {
 } from '../db';
 import { isDate } from '../lib/time';
 import { parseAmount } from '../lib/money';
+import { normalizeName } from '../lib/text';
 
 export const expenses = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
-/** Убирает лишние пробелы, режет до 100 символов, первая буква заглавная («гель  лак» → «Гель лак»). */
-export function normalizeName(raw: unknown): string {
-  const s = String(raw ?? '').replace(/\s+/g, ' ').trim();
-  const [first, ...rest] = Array.from(s).slice(0, 100);
-  return first ? first.toUpperCase() + rest.join('') : '';
-}
+export { normalizeName };
 
 /** Проверка тела запроса. Возвращает [данные, ошибка]. */
 export function validateExpense(b: any) {

@@ -12,6 +12,8 @@ export interface Env {
   TURSO_AUTH_TOKEN?: string;
 }
 
+import type { Status } from './lib/status';
+
 export type Service = 'manicure' | 'pedicure' | 'both' | 'fingers';
 export type Coating = 'gel' | 'none';
 
@@ -28,6 +30,7 @@ export interface Appointment {
   pedicure_coating: Coating | null;
   comment: string | null;
   price: number | null; // цена в валюте мастера, целое число; null — не указана
+  status: Status;       // scheduled | no_show | cancelled
 }
 
 export interface Expense {

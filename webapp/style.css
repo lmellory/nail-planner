@@ -1821,3 +1821,28 @@ body {
 .expenses-empty { text-align: center; color: var(--hint-color); padding: 28px 0; font-size: 14px; }
 
 #btn-delete-expense { flex: 0 0 56px; }
+
+
+/* ==========================================================================
+   Статус записи, «ожидается» и «сорвалось»
+   ========================================================================== */
+.appointment-card.is-inactive { opacity: 0.62; }
+.appointment-card.is-inactive .appt-card-client { text-decoration: line-through; }
+
+.appt-status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.appt-status-badge.is-no_show { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
+.appt-status-badge.is-cancelled { background: rgba(120, 120, 140, 0.15); color: var(--hint-color); border: 1px solid rgba(120, 120, 140, 0.3); }
+
+.income-extra {
+  font-size: 13px;
+  color: var(--hint-color);
+  text-align: center;
+  line-height: 1.5;
+  margin: -2px 0 12px;
+}
