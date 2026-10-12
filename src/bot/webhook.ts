@@ -1,5 +1,6 @@
 // Обработка апдейтов Telegram (webhook). Команды: /start /menu /today /tomorrow /notify /id; для администратора ещё
-// /admin /users /user /stats /health /export /backupall /send /broadcast (см. admin.ts)
+// /admin /users /user /stats /health /export /records /backupall /send /broadcast (см. admin.ts);
+// наблюдателю (VIEWER_IDS) доступны только /admin и /records
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { parseAllowedIds } from '../auth';
@@ -7,7 +8,7 @@ import { ensureUser, getDayNote, listAppointments } from '../db';
 import { addDays, nowInTz } from '../lib/time';
 import { formatDay } from '../lib/format';
 import { openAppKeyboard, sendMessage } from './telegram';
-import { handleAdminCommand, isAdmin, isAdminCommand } from './admin';
+import { handleAdminCommand, isAdmin, isAdminCommand, isViewer, isViewerCommand } from './admin';
 
 export const webhook = new Hono<{ Bindings: Env }>();
 
@@ -61,10 +62,12 @@ webhook.post('/', async (c) => {
       return c.text('ok');
     }
 
-    // Команды администратора (ADMIN_ID). Всем остальным бот на них молчит, как и чужим.
+    // Команды администратора (ADMIN_ID) и наблюдателей (VIEWER_IDS, только /admin и /records).
+    // Всем остальным бот на них молчит, как и чужим.
     if (isAdminCommand(cmd)) {
+      const role = isAdmin(c.env, userId) ? 'admin' : isViewer(c.env, userId) && isViewerCommand(cmd) ? 'viewer' : null;
       // аргументы — всё после команды (в том числе после суффикса «@бот»)
-      if (isAdmin(c.env, userId)) await handleAdminCommand(c.env, msg.chat.id, userId, cmd, text.replace(/^\S+\s*/, ''));
+      if (role) await handleAdminCommand(c.env, msg.chat.id, userId, cmd, text.replace(/^\S+\s*/, ''), role);
       return c.text('ok');
     }
 

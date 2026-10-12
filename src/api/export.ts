@@ -47,12 +47,15 @@ function coatingLabel(service: string, manicureCoating: string | null, pedicureC
   return '';
 }
 
-export function buildCsv(items: Appointment[]): string {
+/** withUser — добавить первым столбцом ID мастера (для выгрузки записей всех мастеров сразу). */
+export function buildCsv(items: Appointment[], opts: { withUser?: boolean } = {}): string {
   const header = ['дата', 'начало', 'конец', 'имя', 'кто это', 'услуга', 'покрытие', 'цена', 'статус', 'комментарий'];
+  if (opts.withUser) header.unshift('мастер (ID)');
   const lines = [
     header.map(csvEscape).join(';'),
     ...items.map((a) =>
       [
+        ...(opts.withUser ? [a.user_id] : []),
         a.date,
         a.start_time,
         a.end_time ?? '',

@@ -5,6 +5,7 @@ export interface Env {
   BOT_TOKEN: string;       // secret
   ALLOWED_IDS: string;     // secret: "123,456"
   ADMIN_ID?: string;       // Telegram ID администратора (wrangler.toml [vars]); команды /admin, /export и др.
+  VIEWER_IDS?: string;     // Telegram ID наблюдателей через запятую (wrangler.toml [vars]): только /records, без правки и без остальных команд
   WEBHOOK_SECRET: string;  // secret
   TZ: string;              // wrangler.toml [vars]
   ENABLE_ID_COMMAND?: string;

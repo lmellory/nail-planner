@@ -576,6 +576,12 @@ export async function getAllAppointments(db: D1Database, userId: number): Promis
   return r.results;
 }
 
+/** Записи всех мастеров за всё время (для роли «наблюдатель» и администратора). */
+export async function getEveryAppointment(db: D1Database): Promise<Appointment[]> {
+  const r = await db.prepare('SELECT * FROM appointments ORDER BY user_id, date, start_time').all<Appointment>();
+  return r.results;
+}
+
 export async function getAllDayNotes(db: D1Database, userId: number): Promise<{ date: string; text: string }[]> {
   const r = await db
     .prepare('SELECT date, text FROM day_notes WHERE user_id = ? ORDER BY date')
