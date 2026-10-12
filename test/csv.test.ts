@@ -40,6 +40,15 @@ describe('buildCsv', () => {
     expect(lines[1]).toBe('2026-10-10;10:00;11:00;Инна;;пальцы;;800;запланирована;');
     expect(lines[2]).toBe('2026-10-10;10:00;11:00;Инна;;пальцы;;;отменена;');
   });
+
+  it('подписывает услугу «маникюр + пальцы» без покрытия', () => {
+    const a: any = {
+      id: 3, user_id: 1, date: '2026-10-10', start_time: '10:00', end_time: '13:00',
+      client_name: 'Инна', who: null, service: 'manicure_fingers',
+      manicure_coating: null, pedicure_coating: null, comment: null, status: 'scheduled', price: 1500,
+    };
+    expect(buildCsv([a]).split('\r\n')[1]).toBe('2026-10-10;10:00;13:00;Инна;;маникюр + пальцы;;1500;запланирована;');
+  });
 });
 
 describe('buildFinanceCsv', () => {

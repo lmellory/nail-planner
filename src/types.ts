@@ -14,7 +14,7 @@ export interface Env {
 
 import type { Status } from './lib/status';
 
-export type Service = 'manicure' | 'pedicure' | 'both' | 'fingers';
+export type Service = 'manicure' | 'pedicure' | 'both' | 'manicure_fingers' | 'fingers';
 export type Coating = 'gel' | 'none';
 
 export interface Appointment {

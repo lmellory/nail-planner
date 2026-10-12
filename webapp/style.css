@@ -679,6 +679,12 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
+/* Четыре услуги: сетка 2×2, чтобы длинная подпись «Маникюр + пальцы» помещалась на узком экране */
+#service-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
 /* Чипы выбора покрытия */
 .coating-chips {
   display: flex;

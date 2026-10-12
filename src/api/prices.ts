@@ -1,5 +1,5 @@
 // Прайс услуг: цена подставляется в форму новой записи.
-//   GET /api/prices → { manicure: 800, pedicure: null, both: null, fingers: 300 }  (null — цена не задана)
+//   GET /api/prices → { manicure: 800, pedicure: null, both: null, manicure_fingers: 300, fingers: null }  (null — цена не задана)
 //   PUT /api/prices ← тот же объект; null/пусто удаляет цену услуги
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';

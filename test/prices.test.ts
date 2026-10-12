@@ -9,6 +9,10 @@ describe('parsePricesBody', () => {
     });
   });
 
+  it('знает услугу «маникюр + пальцы»', () => {
+    expect(parsePricesBody({ manicure_fingers: '1 500' })).toEqual({ ok: true, changes: [['manicure_fingers', 1500]] });
+  });
+
   it('неуказанные услуги не трогает, неизвестные игнорирует', () => {
     expect(parsePricesBody({ manicure: 500, hairdo: 99999 })).toEqual({ ok: true, changes: [['manicure', 500]] });
     expect(parsePricesBody({})).toEqual({ ok: true, changes: [] });

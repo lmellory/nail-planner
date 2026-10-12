@@ -41,7 +41,23 @@ describe('validate appointment input', () => {
     expect(bothData?.end_time).toBe('15:30');
   });
 
-  it('услуга «пальцы»: конец +1 ч, покрытие не требуется и не сохраняется', () => {
+  it('услуга «маникюр + пальцы»: конец +3 ч, покрытие не требуется и не сохраняется', () => {
+    const [data, err] = validate({
+      date: '2026-10-15',
+      start_time: '10:00',
+      client_name: 'Инна',
+      service: 'manicure_fingers',
+      manicure_coating: 'gel',
+      pedicure_coating: 'gel',
+    });
+    expect(err).toBeNull();
+    expect(data?.service).toBe('manicure_fingers');
+    expect(data?.end_time).toBe('13:00');
+    expect(data?.manicure_coating).toBeNull();
+    expect(data?.pedicure_coating).toBeNull();
+  });
+
+  it('услуга «пальцы» (старая) по-прежнему принимается: конец +1 ч, покрытие не требуется и не сохраняется', () => {
     const [data, err] = validate({
       date: '2026-10-15',
       start_time: '10:00',

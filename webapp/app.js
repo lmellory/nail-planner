@@ -546,6 +546,7 @@ function renderAppointmentsList() {
     let serviceRu = 'Маникюр';
     if (a.service === 'pedicure') serviceRu = 'Педикюр';
     else if (a.service === 'both') serviceRu = 'Маникюр + Педикюр';
+    else if (a.service === 'manicure_fingers') serviceRu = 'Маникюр + пальцы';
     else if (a.service === 'fingers') serviceRu = 'Пальцы';
 
     let coatingRu = '';
@@ -713,8 +714,8 @@ function updateServiceAndCoatingUI() {
   } else if (selectedService === 'both') {
     if (manGroup) manGroup.style.display = 'block';
     if (pedGroup) pedGroup.style.display = 'block';
-  } else if (selectedService === 'fingers') {
-    // «Пальцы» — без выбора покрытия
+  } else if (selectedService === 'manicure_fingers' || selectedService === 'fingers') {
+    // «Маникюр + пальцы» (и старая услуга «пальцы») — без выбора покрытия
     if (manGroup) manGroup.style.display = 'none';
     if (pedGroup) pedGroup.style.display = 'none';
   }
@@ -1133,6 +1134,7 @@ function renderSearchResults(items) {
     let serviceRu = 'Маникюр';
     if (a.service === 'pedicure') serviceRu = 'Педикюр';
     else if (a.service === 'both') serviceRu = 'Маникюр + Педикюр';
+    else if (a.service === 'manicure_fingers') serviceRu = 'Маникюр + пальцы';
     else if (a.service === 'fingers') serviceRu = 'Пальцы';
 
     const whoHtml = a.who ? `<span class="appt-card-who">${escapeHtml(a.who)}</span>` : '';
@@ -1368,7 +1370,7 @@ document.getElementById('restore-file-input')?.addEventListener('change', (e) =>
 });
 
 // ===== ПРАЙС УСЛУГ =====
-const PRICE_SERVICES = ['manicure', 'pedicure', 'both', 'fingers'];
+const PRICE_SERVICES = ['manicure', 'pedicure', 'both', 'manicure_fingers'];
 
 function applyPricesToInputs() {
   for (const s of PRICE_SERVICES) {

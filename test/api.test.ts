@@ -206,7 +206,7 @@ describe('траты', () => {
 
 describe('прайс и настройки', () => {
   it('прайс: по умолчанию пусто, частичное обновление, null удаляет, ошибка ничего не меняет', async () => {
-    expect((await api(env, OWNER, 'GET', '/api/prices')).json).toEqual({ manicure: null, pedicure: null, both: null, fingers: null });
+    expect((await api(env, OWNER, 'GET', '/api/prices')).json).toEqual({ manicure: null, pedicure: null, both: null, manicure_fingers: null, fingers: null });
     expect((await api(env, OWNER, 'PUT', '/api/prices', { manicure: 800, fingers: '300' })).json).toMatchObject({ manicure: 800, fingers: 300, pedicure: null });
     expect((await api(env, OWNER, 'PUT', '/api/prices', { manicure: 850 })).json).toMatchObject({ manicure: 850, fingers: 300 });
     expect((await api(env, OWNER, 'PUT', '/api/prices', { fingers: null })).json.fingers).toBeNull();
