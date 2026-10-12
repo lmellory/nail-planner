@@ -3,7 +3,7 @@
 // наблюдателю (VIEWER_IDS) доступны только /admin и /records
 import { Hono } from 'hono';
 import type { Env } from '../types';
-import { parseAllowedIds } from '../auth';
+import { isAllowedUser } from '../lib/access';
 import { ensureUser, getDayNote, listAppointments } from '../db';
 import { addDays, nowInTz } from '../lib/time';
 import { formatDay } from '../lib/format';
@@ -38,6 +38,12 @@ const WELCOME =
   `• /notify — принудительно прислать вечернюю сводку\n` +
   `• /menu — открыть ежедневник`;
 
+const ADMIN_NOTE =
+  `\n\n🛠 <b>Админ-панель:</b> кнопка 🛠 в шапке приложения. Там можно выбрать мастера и добавлять, менять и удалять его записи. Команды администратора: /admin`;
+
+const ADMIN_WELCOME =
+  `🛠 <b>Вы администратор.</b>\n\nОткройте приложение: кнопка 🛠 в шапке открывает админ-панель, где можно выбрать мастера и добавлять, менять и удалять его записи.\n\nКоманды администратора: /admin`;
+
 webhook.post('/', async (c) => {
   // Telegram присылает секрет в заголовке (задаётся при setWebhook через secret_token).
   // Если секрет в окружении не задан — не принимаем ничего.
@@ -71,11 +77,19 @@ webhook.post('/', async (c) => {
       return c.text('ok');
     }
 
-    // Чужим бот молчит
-    if (!parseAllowedIds(c.env.ALLOWED_IDS).includes(userId)) return c.text('ok');
+    // Чужим (и заблокированным) бот молчит. Администратор без доступа мастера получает только вход в приложение.
+    const staff = isAdmin(c.env, userId);
+    const allowed = await isAllowedUser(c.env, userId);
+    if (!allowed && !staff) return c.text('ok');
+    if (!allowed) {
+      if (cmd === '/start' || cmd === '/menu') {
+        await sendMessage(c.env, msg.chat.id, ADMIN_WELCOME, openAppKeyboard(appUrl, '🛠 Открыть приложение'));
+      }
+      return c.text('ok');
+    }
 
     if (cmd === '/start' || cmd === '/menu') {
-      await sendMessage(c.env, msg.chat.id, WELCOME, openAppKeyboard(appUrl, '💅 Открыть ежедневник'));
+      await sendMessage(c.env, msg.chat.id, staff ? WELCOME + ADMIN_NOTE : WELCOME, openAppKeyboard(appUrl, '💅 Открыть ежедневник'));
     } else if (cmd === '/today' || cmd === '/tomorrow' || cmd === '/notify') {
       // «Сегодня» считаем в часовом поясе пользователя (как и cron), а не в глобальном TZ
       const u = await ensureUser(c.env.DB, userId, c.env.TZ);

@@ -1852,3 +1852,50 @@ body {
   line-height: 1.5;
   margin: -2px 0 12px;
 }
+
+
+/* ===== Админ-панель и режим «правка за мастера» ===== */
+.act-as-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--accent-pink-soft);
+  border-bottom: 1px solid var(--accent-pink-border);
+  font-size: 14px;
+}
+.act-as-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-as-exit {
+  flex: none;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-pink-border);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* В этом режиме доступны только записи: остальное скрыто (сервер всё равно не пустит) */
+.acting-as #btn-open-clients,
+.acting-as #btn-open-income,
+.acting-as #btn-open-settings,
+.acting-as #btn-day-note-action,
+.acting-as #btn-edit-note-card { display: none !important; }
+
+.admin-intro { margin: 4px 0 14px; font-size: 14px; opacity: 0.8; line-height: 1.4; }
+.admin-masters-list { display: flex; flex-direction: column; gap: 10px; }
+.admin-master-card { cursor: pointer; }
+.admin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-pink-border);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+.admin-badge.is-banned { background: var(--accent-pink-soft); }

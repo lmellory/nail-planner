@@ -22,7 +22,7 @@ import {
   listAppointments,
   removeScheduledDelete,
 } from './db';
-import { parseAllowedIds } from './auth';
+import { getAllowedIds } from './lib/access';
 import { addDays, nowInTz } from './lib/time';
 import { formatDay } from './lib/format';
 import { deleteMessage, escapeHtml, openAppKeyboard, sendDocument, sendMessage } from './bot/telegram';
@@ -80,7 +80,7 @@ export async function runNotifications(env: Env, appUrl: string) {
     console.error('processScheduledDeletes error', e);
   }
 
-  for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
+  for (const userId of await getAllowedIds(env)) {
     try {
       const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
       if (!u.notify_enabled) continue;
@@ -193,7 +193,7 @@ export function formatBirthdayNotification(
 }
 
 export async function runBirthdayNotifications(env: Env, appUrl: string) {
-  for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
+  for (const userId of await getAllowedIds(env)) {
     try {
       const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
       const now = nowInTz(u.tz || env.TZ);
@@ -261,7 +261,7 @@ export function backupDecision(
 }
 
 export async function runWeeklyBackups(env: Env) {
-  for (const userId of parseAllowedIds(env.ALLOWED_IDS)) {
+  for (const userId of await getAllowedIds(env)) {
     try {
       const u = (await getUser(env.DB, userId)) ?? (await ensureUser(env.DB, userId, env.TZ));
       if (u.backup_enabled === 0) continue;

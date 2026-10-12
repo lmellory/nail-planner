@@ -29,6 +29,12 @@
         <h1 class="header-title" id="header-title">Ежедневник</h1>
       </div>
       <div class="header-actions" id="header-actions">
+        <button type="button" class="icon-btn" id="btn-open-admin" title="Админ-панель" style="display: none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <polyline points="9 12 11 14 15 10"></polyline>
+          </svg>
+        </button>
         <button type="button" class="icon-btn" id="btn-open-clients" title="Клиенты">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -66,6 +72,12 @@
         </button>
       </div>
     </header>
+
+    <!-- Плашка режима администратора: показывается, пока правятся записи мастера -->
+    <div class="act-as-banner" id="act-as-banner" style="display: none;">
+      <span class="act-as-text">🛠 Вы правите записи: <b id="act-as-label"></b></span>
+      <button type="button" class="act-as-exit" id="btn-act-as-exit">Выйти</button>
+    </div>
 
     <!-- ЭКРАН 1: Основной (Неделя + список записей дня) -->
     <main class="screen active" id="screen-main">
@@ -302,6 +314,16 @@
         <div class="search-hint" id="search-hint">Введите минимум 2 буквы для поиска</div>
         <div class="search-results-list" id="search-results-list">
           <!-- Результаты поиска генерируются через JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ЭКРАН: Админ-панель (выбор мастера) -->
+    <section class="screen" id="screen-admin">
+      <div class="screen-content">
+        <div class="admin-intro">Выберите мастера: можно смотреть, добавлять, менять и удалять его записи. Все изменения попадают в журнал.</div>
+        <div class="admin-masters-list" id="admin-masters-list">
+          <!-- Мастера генерируются через JS -->
         </div>
       </div>
     </section>
