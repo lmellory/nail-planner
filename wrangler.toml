@@ -20,6 +20,9 @@ enabled = true
 [vars]
 TZ = "Europe/Chisinau"
 ENABLE_ID_COMMAND = "true"
+# Администратор: ему доступна команда /export <ID> (выгрузка данных любого пользователя в чат).
+# Это Telegram ID, не секрет; при желании можно хранить как секрет: wrangler secret put ADMIN_ID
+ADMIN_ID = "5067848442"
 TURSO_URL = "libsql://nails-lmellory.aws-eu-west-1.turso.io"
 # После первого деплоя впиши сюда адрес своего Worker (с https:// и слэшем в конце):
 APP_URL = "https://nail-planner.mellory.workers.dev/"
