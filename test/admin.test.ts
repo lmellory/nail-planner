@@ -385,7 +385,8 @@ describe('/records', () => {
     const docs = tg.filter((c) => c.method === 'sendDocument');
     expect(docs).toHaveLength(1);
     expect(docs[0].filename).toBe('nail-planner-all-2026-10-14.csv');
-    expect(docs[0].file!.startsWith('\uFEFFмастер (ID);дата;')).toBe(true);
+    // BOM в сам файл пишется (buildCsv), но File.text() при чтении его отбрасывает, поэтому проверяем начало без него
+    expect(docs[0].file!.startsWith('мастер (ID);дата;')).toBe(true);
     expect(docs[0].file).toContain(`${OWNER};2026-10-14;10:00;`);
     expect(docs[0].file).toContain('Админская клиентка');
     expect(docs[0].file).toContain(`${OTHER};2026-10-14;10:00;`);
