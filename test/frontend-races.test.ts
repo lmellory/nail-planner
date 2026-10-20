@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { loadFrontend } from './helpers/frontend';
 
 let dom: JSDOM, w: any;
@@ -73,5 +73,30 @@ it('двойное сохранение отправляет одну запис
   expect(pending.filter(p => p.url === '/api/appointments')).toHaveLength(2);
   pending[1].resolve({ error: 'Попробуйте снова' }, 500);
   await retry;
+  expect(state.pendingWrites).toBe(0);
+});
+
+it('не открывает расписание для следующей записи до завершения предыдущего сохранения', async () => {
+  const { state } = modules('js/state.js');
+  state.currentScreen = 'form';
+  w.document.getElementById('form-appt-date').value = '2026-10-20';
+  w.document.getElementById('form-appt-start').value = '10:00';
+  w.document.getElementById('form-appt-client').value = 'Анна';
+  const save = modules('js/appointment-form.js').saveAppointment();
+  await vi.waitFor(() => expect(pending.some(p => p.url === '/api/appointments')).toBe(true));
+  pending.find(p => p.url === '/api/appointments')!.resolve({ id: 1 });
+  await vi.waitFor(() => expect(pending.some(p => p.url.startsWith('/api/days?'))).toBe(true));
+  expect(state.currentScreen).toBe('form');
+  expect(w.document.getElementById('btn-submit-appt').disabled).toBe(true);
+  pending.find(p => p.url === '/api/clients')!.resolve([]);
+  pending.find(p => p.url.startsWith('/api/days?'))!.resolve([]);
+  await vi.waitFor(() => expect(pending.some(p => p.url.startsWith('/api/notes/'))).toBe(true));
+  pending.find(p => p.url.startsWith('/api/appointments?'))!.resolve([]);
+  pending.find(p => p.url.startsWith('/api/notes/'))!.resolve({ text: '' });
+  await vi.waitFor(() => expect(pending.some(p => p.url.startsWith('/api/days/slots?'))).toBe(true));
+  pending.find(p => p.url.startsWith('/api/days/slots?'))!.resolve({ is_work_day: false, slots: [] });
+  await save;
+  expect(state.currentScreen).toBe('main');
+  expect(w.document.getElementById('btn-submit-appt').disabled).toBe(false);
   expect(state.pendingWrites).toBe(0);
 });

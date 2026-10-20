@@ -311,9 +311,10 @@ async function performSaveAppointment() {
     // Обновляем список клиентов в фоне, чтобы автоподстановка сразу знала нового клиента
     loadClientsDatalist().catch(() => {});
 
-    goScreen('main');
     await loadWeekSummary();
     await loadSelectedDay();
+    // Показываем расписание после обновления данных: следующая форма уже сможет сохраняться.
+    goScreen('main');
   } catch (err) {
     console.error('Ошибка сохранения записи:', err);
   }
