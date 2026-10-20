@@ -1,7 +1,9 @@
+import { isAbortError } from './requests.js';
+import { getApi } from './api-contracts.js';
+import { byId } from './dom.js';
 import { requestGate } from './requests.js';
 import { state, todayStr } from './state.js';
 import { RU_MONTHS, RU_WEEKDAYS_SHORT, addDays, fmt, formatApptTime, formatFullDateRu, mondayOf, parseDate } from './dates.js';
-import { api } from './api.js';
 import { haptic } from './telegram.js';
 import { openForm } from './appointment-form.js';
 import { escapeHtml } from './ui.js';
@@ -17,7 +19,7 @@ export async function loadWeekSummary() {
   const from = state.weekStart;
   const to = addDays(state.weekStart, 6);
   try {
-    const summary = await api(`/days?from=${from}&to=${to}`, { signal: request.signal });
+    const summary = await getApi(`/days?from=${from}&to=${to}`, { signal: request.signal });
     if (!request.current() || from !== state.weekStart) return;
     state.daySummaryMap.clear();
     for (const item of summary) {
@@ -25,14 +27,14 @@ export async function loadWeekSummary() {
     }
     renderWeekStrip();
   } catch (err) {
-    if (err.name === 'AbortError') return;
+    if (isAbortError(err)) return;
     console.error('Ошибка загрузки сводки дней:', err);
   }
 }
 
 export function renderWeekStrip() {
-  const strip = document.getElementById('week-strip');
-  const periodLabel = document.getElementById('week-period-label');
+  const strip = byId('week-strip', 'div');
+  const periodLabel = byId('week-period-label', 'span');
   if (!strip) return;
 
   const mDate = parseDate(state.weekStart);
@@ -88,6 +90,7 @@ export function renderWeekStrip() {
   }
 }
 
+/** @param {string} dateStr */
 export function selectDate(dateStr) {
   state.selectedDate = dateStr;
   const monday = fmt(mondayOf(parseDate(dateStr)));
@@ -100,11 +103,12 @@ export function selectDate(dateStr) {
   loadSelectedDay();
 }
 
+/** @param {number} days */
 export function shiftWeek(days) {
   haptic('light');
   state.weekStart = addDays(state.weekStart, days);
   // Переносим выбранный день на аналогичный день сдвинутой недели
-  const currentOffset = Math.floor((parseDate(state.selectedDate) - parseDate(state.weekStart)) / (86400000));
+  const currentOffset = Math.floor((parseDate(state.selectedDate).getTime() - parseDate(state.weekStart).getTime()) / 86400000);
   if (currentOffset < 0 || currentOffset > 6) {
     state.selectedDate = state.weekStart;
   }
@@ -115,7 +119,7 @@ export function shiftWeek(days) {
 // Свайп по полосе недели
 let touchStartX = 0;
 let touchStartY = 0;
-const stripContainer = document.getElementById('week-strip-container');
+const stripContainer = byId('week-strip-container', 'div');
 if (stripContainer) {
   stripContainer.addEventListener('touchstart', (e) => {
     touchStartX = e.touches[0].clientX;
@@ -135,12 +139,12 @@ if (stripContainer) {
 // ===== 2. ЗАПИСИ И ЗАМЕТКА ВЫБРАННОГО ДНЯ =====
 
 export async function loadSelectedDay() {
-  const heading = document.getElementById('selected-day-heading');
-  const sub = document.getElementById('selected-day-sub');
-  const listEl = document.getElementById('appointments-list');
-  const noteCard = document.getElementById('day-note-card');
-  const noteContent = document.getElementById('day-note-content');
-  const btnNoteText = document.getElementById('btn-day-note-text');
+  const heading = byId('selected-day-heading', 'h2');
+  const sub = byId('selected-day-sub', 'div');
+  const listEl = byId('appointments-list', 'div');
+  const noteCard = byId('day-note-card', 'div');
+  const noteContent = byId('day-note-content', 'p');
+  const btnNoteText = byId('btn-day-note-text', 'span');
 
   if (heading) {
     heading.textContent = state.selectedDate === todayStr ? 'Сегодня' : formatFullDateRu(state.selectedDate);
@@ -160,8 +164,8 @@ export async function loadSelectedDay() {
   // Загружаем записи и заметку дня
   try {
     const [appts, noteRes] = await Promise.all([
-      api(`/appointments?from=${dateToLoad}&to=${dateToLoad}`, { signal: currentDayAbortCtrl.signal }),
-      api(`/notes/${dateToLoad}`, { signal: currentDayAbortCtrl.signal }),
+      getApi(`/appointments?from=${dateToLoad}&to=${dateToLoad}`, { signal: currentDayAbortCtrl.signal }),
+      getApi(`/notes/${dateToLoad}`, { signal: currentDayAbortCtrl.signal }),
     ]);
 
     if (reqId !== currentDayRequestId || dateToLoad !== state.selectedDate) return;
@@ -183,7 +187,7 @@ export async function loadSelectedDay() {
     renderAppointmentsList();
     await loadFreeSlots(dateToLoad);
   } catch (err) {
-    if (err.name === 'AbortError') return;
+    if (isAbortError(err)) return;
     console.error('Ошибка загрузки дня:', err);
     if (listEl && reqId === currentDayRequestId) {
       listEl.innerHTML = '<div class="empty-state"><p>Ошибка загрузки записей</p></div>';
@@ -192,17 +196,19 @@ export async function loadSelectedDay() {
 }
 
 let currentDayRequestId = 0;
-let currentDayAbortCtrl = null;
+/** @type {AbortController | undefined} */
+let currentDayAbortCtrl;
 
+/** @param {string} dateStr */
 export async function loadFreeSlots(dateStr) {
   const request = slotsRequest();
-  const card = document.getElementById('free-slots-card');
-  const countEl = document.getElementById('free-slots-count');
-  const chipsEl = document.getElementById('free-slots-chips');
+  const card = byId('free-slots-card', 'div');
+  const countEl = byId('free-slots-count', 'span');
+  const chipsEl = byId('free-slots-chips', 'div');
   if (!card || !chipsEl) return;
 
   try {
-    const res = await api(`/days/slots?date=${dateStr}`, { signal: request.signal });
+    const res = await getApi(`/days/slots?date=${dateStr}`, { signal: request.signal });
     if (!request.current() || dateStr !== state.selectedDate) return;
     if (!res.is_work_day || !res.slots || !res.slots.length) {
       card.style.display = 'none';
@@ -231,10 +237,14 @@ export async function loadFreeSlots(dateStr) {
   }
 }
 
+/** @type {Partial<Record<import('./contracts').Appointment['status'], string>>} */
 const STATUS_RU = { no_show: 'Не пришла', cancelled: 'Отменена' };
+/** @param {Pick<import('./contracts').Appointment,'status'>} a */
 export const statusBadgeHtml = (a) => (STATUS_RU[a.status] ? `<span class="appt-status-badge is-${a.status}">${STATUS_RU[a.status]}</span>` : '');
+/** @param {Pick<import('./contracts').Appointment,'status'>} a */
 export const inactiveClass = (a) => (STATUS_RU[a.status] ? ' is-inactive' : '');
 
+/** @param {number} n @param {string} one @param {string} few @param {string} many */
 export function plural(n, one, few, many) {
   const a = Math.abs(n) % 100, b = a % 10;
   if (a > 10 && a < 20) return many;
@@ -243,7 +253,7 @@ export function plural(n, one, few, many) {
 }
 
 export function renderAppointmentsList() {
-  const listEl = document.getElementById('appointments-list');
+  const listEl = byId('appointments-list', 'div');
   if (!listEl) return;
 
   if (!state.appointments.length) {
@@ -261,13 +271,14 @@ export function renderAppointmentsList() {
   for (const a of state.appointments) {
     const card = document.createElement('div');
     card.className = 'appointment-card' + inactiveClass(a);
-    card.setAttribute('data-id', a.id);
+    card.setAttribute('data-id', String(a.id));
 
     const whoHtml = a.who ? `<span class="appt-card-who">${escapeHtml(a.who)}</span>` : '';
 
     const serviceRu = serviceName(a.service);
 
     let coatingRu = '';
+    /** @param {import('../../src/types').Coating|null} c */
     const coatTxt = (c) => (c === 'gel' ? 'с покрытием' : 'без покрытия');
     if (a.service === 'manicure') {
       coatingRu = ` · ${coatTxt(a.manicure_coating)}`;

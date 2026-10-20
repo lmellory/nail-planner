@@ -1,10 +1,11 @@
+import { byId } from './dom.js';
 import { RU_MONTHS, RU_WEEKDAYS_FULL, fmt } from './dates.js';
 import { tg } from './telegram.js';
 
 export function updateGreeting() {
-  const dateEl = document.getElementById('greeting-date');
-  const titleEl = document.getElementById('greeting-title');
-  const avatarEl = document.getElementById('greeting-avatar');
+  const dateEl = byId('greeting-date', 'span');
+  const titleEl = byId('greeting-title', 'h2');
+  const avatarEl = byId('greeting-avatar', 'div');
 
   const now = new Date();
   const dStr = fmt(now);

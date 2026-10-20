@@ -1,3 +1,4 @@
+import { byId } from './dom.js';
 import { singleAction } from './requests.js';
 import { api } from './api.js';
 import { haptic } from './telegram.js';
@@ -8,6 +9,7 @@ import { loadPrices } from './prices.js';
 import { openSettings } from './settings.js';
 
 // ===== ВОССТАНОВЛЕНИЕ ИЗ РЕЗЕРВНОЙ КОПИИ =====
+/** @param {File} file */
 async function restoreFromFile(file) {
   let backup;
   try {
@@ -15,6 +17,7 @@ async function restoreFromFile(file) {
   } catch {
     return showToast('Файл не похож на резервную копию');
   }
+/** @type {{report: import('../../src/lib/restore').RestoreReport}} */
   let preview;
   try {
     preview = await api('/import', { method: 'POST', body: JSON.stringify({ backup }) }); // только проверка
@@ -41,20 +44,23 @@ async function restoreFromFile(file) {
   });
 }
 
-document.getElementById('btn-restore-backup')?.addEventListener('click', () => {
+byId('btn-restore-backup', 'button')?.addEventListener('click', () => {
   haptic('light');
-  document.getElementById('restore-file-input')?.click();
+  byId('restore-file-input', 'input')?.click();
 });
-document.getElementById('restore-file-input')?.addEventListener('change', (e) => {
-  const file = e.target.files?.[0];
-  e.target.value = ''; // чтобы тот же файл можно было выбрать повторно
+byId('restore-file-input', 'input')?.addEventListener('change', (e) => {
+  const input = byId('restore-file-input', 'input');
+  const file = input.files?.[0];
+  input.value = ''; // чтобы тот же файл можно было выбрать повторно
   if (file) restoreFromFile(file);
 });
 
+/** @param {'csv'|'json'} [format] */
 async function exportData(format = 'csv') {
   haptic('light');
   showToast('Формируем и отправляем файл в чат…');
   try {
+/** @type {{ok:boolean}} */
     const res = await api('/export/send', {
       method: 'POST',
       body: JSON.stringify({ format }),
@@ -68,5 +74,5 @@ async function exportData(format = 'csv') {
   }
 }
 
-document.getElementById('btn-export-csv')?.addEventListener('click', () => exportData('csv'));
-document.getElementById('btn-export-json')?.addEventListener('click', () => exportData('json'));
+byId('btn-export-csv', 'button')?.addEventListener('click', () => exportData('csv'));
+byId('btn-export-json', 'button')?.addEventListener('click', () => exportData('json'));

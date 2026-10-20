@@ -2,8 +2,10 @@ import { tg } from './telegram.js';
 import { state } from './state.js';
 
 // ===== Уведомления (Toast) и тактильный отклик =====
-let toastTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let toastTimer;
 
+/** @param {string} text */
 export function showToast(text) {
   const el = document.getElementById('toast');
   if (!el) return;
@@ -15,8 +17,10 @@ export function showToast(text) {
   }, 2800);
 }
 
+/** @param {string} message @param {(confirmed:boolean)=>unknown} callback */
 export function confirmDialog(message, callback) {
   const context = state.contextVersion;
+  /** @param {boolean} confirmed */
   const complete = confirmed => {
     if (context !== state.contextVersion) return showToast('Мастер изменён. Повторите действие');
     return callback(confirmed);
@@ -29,6 +33,7 @@ export function confirmDialog(message, callback) {
   }
 }
 
+/** @param {unknown} s */
 export function escapeHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

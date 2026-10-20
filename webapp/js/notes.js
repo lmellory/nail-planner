@@ -1,3 +1,4 @@
+import { byId } from './dom.js';
 import { formatFullDateRu } from './dates.js';
 import { state } from './state.js';
 import { goScreen } from './navigation.js';
@@ -10,8 +11,8 @@ import { loadSelectedDay, loadWeekSummary } from './schedule.js';
 // ===== 6. ЗАМЕТКА ДНЯ =====
 
 function openNote() {
-  const titleDate = document.getElementById('note-screen-date');
-  const textarea = document.getElementById('note-text-input');
+  const titleDate = byId('note-screen-date', 'span');
+  const textarea = byId('note-text-input', 'textarea');
 
   if (titleDate) titleDate.textContent = formatFullDateRu(state.selectedDate);
   if (textarea) textarea.value = state.currentDayNote || '';
@@ -25,7 +26,7 @@ export function saveDayNote() {
 }
 
 async function performSaveDayNote() {
-  const textarea = document.getElementById('note-text-input');
+  const textarea = byId('note-text-input', 'textarea');
   const text = textarea?.value?.trim() || '';
 
   try {
@@ -67,13 +68,13 @@ function deleteDayNote() {
   });
 }
 
-document.getElementById('btn-day-note-action')?.addEventListener('click', () => {
+byId('btn-day-note-action', 'button')?.addEventListener('click', () => {
   haptic('light');
   openNote();
 });
-document.getElementById('btn-edit-note-card')?.addEventListener('click', () => {
+byId('btn-edit-note-card', 'button')?.addEventListener('click', () => {
   haptic('light');
   openNote();
 });
-document.getElementById('btn-delete-note')?.addEventListener('click', deleteDayNote);
-document.getElementById('btn-cancel-note')?.addEventListener('click', () => goScreen('main'));
+byId('btn-delete-note', 'button')?.addEventListener('click', deleteDayNote);
+byId('btn-cancel-note', 'button')?.addEventListener('click', () => goScreen('main'));

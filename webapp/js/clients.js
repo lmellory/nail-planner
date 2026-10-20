@@ -1,3 +1,6 @@
+import { isAbortError } from './requests.js';
+import { getApi } from './api-contracts.js';
+import { byId } from './dom.js';
 import { requestGate, singleAction } from './requests.js';
 import { api } from './api.js';
 import { confirmDialog, escapeHtml, showToast } from './ui.js';
@@ -12,43 +15,45 @@ const datalistRequest = requestGate();
 const clientViewRequest = requestGate();
 // ===== 8. БАЗА КЛИЕНТОВ =====
 
+/** @type {import('./contracts').Client[]} */
 export let cachedClients = [];
+/** @type {number|null} */
 let currentViewingClientId = null;
 
 export async function loadClientsDatalist() {
   const request = datalistRequest();
   try {
-    const clients = await api('/clients', { signal: request.signal });
+    const clients = await getApi('/clients', { signal: request.signal });
     if (!request.current()) return;
     cachedClients = clients;
-    const dl = document.getElementById('clients-datalist');
+    const dl = byId('clients-datalist', 'datalist');
     if (!dl) return;
     dl.innerHTML = '';
     for (const c of cachedClients) {
       const opt = document.createElement('option');
-      opt.value = c.name;
+      opt.value = String(c.name);
       if (c.phone) opt.label = c.phone;
       dl.appendChild(opt);
     }
   } catch (e) {
-    if (e.name === 'AbortError') return;
+    if (isAbortError(e)) return;
     console.error('Ошибка обновления подсказок клиентов', e);
   }
 }
 
 async function loadClients(search = '') {
   const request = clientsRequest();
-  const listEl = document.getElementById('clients-list');
+  const listEl = byId('clients-list', 'div');
   if (!listEl) return;
   listEl.innerHTML = '<div class="loading-spinner">Загрузка клиентов…</div>';
 
   try {
-    const clients = await api(`/clients?q=${encodeURIComponent(search)}`, { signal: request.signal });
+    const clients = await getApi(`/clients?q=${encodeURIComponent(search)}`, { signal: request.signal });
     if (!request.current()) return;
     cachedClients = clients;
     renderClientsList(cachedClients);
   } catch (err) {
-    if (err.name === 'AbortError' || !request.current()) return;
+    if (isAbortError(err) || !request.current()) return;
     console.error('Ошибка загрузки клиентов:', err);
     listEl.innerHTML = '<div class="empty-state"><p>Ошибка загрузки клиентов</p></div>';
   }
@@ -59,6 +64,7 @@ const MONTH_NAMES_RU = [
   'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
 ];
 
+/** @param {string|null|undefined} ddmm */
 function formatBirthdayRu(ddmm) {
   if (!ddmm) return '';
   const [d, m] = ddmm.split('.');
@@ -68,6 +74,7 @@ function formatBirthdayRu(ddmm) {
   return `${day} ${MONTH_NAMES_RU[month]}`;
 }
 
+/** @param {string|null|undefined} ddmm */
 function isBirthdayToday(ddmm) {
   if (!ddmm) return false;
   const now = new Date();
@@ -77,26 +84,27 @@ function isBirthdayToday(ddmm) {
 }
 
 function initBirthdaySelectors() {
-  const daySelect = document.getElementById('edit-client-bday-day');
+  const daySelect = byId('edit-client-bday-day', 'select');
   if (!daySelect || daySelect.options.length > 1) return;
   for (let i = 1; i <= 31; i++) {
     const opt = document.createElement('option');
     const val = String(i).padStart(2, '0');
-    opt.value = val;
-    opt.textContent = i;
+    opt.value = String(val);
+    opt.textContent = String(i);
     daySelect.appendChild(opt);
   }
 }
 
-document.getElementById('btn-clear-bday')?.addEventListener('click', () => {
-  const d = document.getElementById('edit-client-bday-day');
-  const m = document.getElementById('edit-client-bday-month');
+byId('btn-clear-bday', 'button')?.addEventListener('click', () => {
+  const d = byId('edit-client-bday-day', 'select');
+  const m = byId('edit-client-bday-month', 'select');
   if (d) d.value = '';
   if (m) m.value = '';
 });
 
+/** @param {import('./contracts').Client[]} items */
 function renderClientsList(items) {
-  const listEl = document.getElementById('clients-list');
+  const listEl = byId('clients-list', 'div');
   if (!listEl) return;
 
   if (!items || !items.length) {
@@ -149,24 +157,25 @@ function renderClientsList(items) {
   }
 }
 
+/** @param {number} id */
 async function openClientView(id) {
   const request = clientViewRequest();
   currentViewingClientId = id;
-  const modal = document.getElementById('modal-client-view');
-  const nameEl = document.getElementById('modal-client-name');
-  const bdayRow = document.getElementById('client-view-bday-row');
-  const bdayText = document.getElementById('client-view-bday-text');
-  const phoneRow = document.getElementById('client-view-phone-row');
-  const phoneLink = document.getElementById('client-view-phone-link');
-  const tgRow = document.getElementById('client-view-tg-row');
-  const tgLink = document.getElementById('client-view-tg-link');
-  const notesBox = document.getElementById('client-view-notes-box');
-  const notesText = document.getElementById('client-view-notes-text');
-  const historyCount = document.getElementById('client-history-count');
-  const historyList = document.getElementById('client-history-list');
+  const modal = byId('modal-client-view', 'div');
+  const nameEl = byId('modal-client-name', 'h3');
+  const bdayRow = byId('client-view-bday-row', 'div');
+  const bdayText = byId('client-view-bday-text', 'span');
+  const phoneRow = byId('client-view-phone-row', 'div');
+  const phoneLink = byId('client-view-phone-link', 'a');
+  const tgRow = byId('client-view-tg-row', 'div');
+  const tgLink = byId('client-view-tg-link', 'a');
+  const notesBox = byId('client-view-notes-box', 'div');
+  const notesText = byId('client-view-notes-text', 'p');
+  const historyCount = byId('client-history-count', 'span');
+  const historyList = byId('client-history-list', 'div');
 
   try {
-    const data = await api(`/clients/${id}`, { signal: request.signal });
+    const data = await getApi(`/clients/${id}`, { signal: request.signal });
     if (!request.current() || currentViewingClientId !== id) return;
     const client = data.client;
     const history = data.history || [];
@@ -231,43 +240,44 @@ async function openClientView(id) {
 
     if (modal) modal.style.display = 'flex';
   } catch (err) {
-    if (err.name === 'AbortError') return;
+    if (isAbortError(err)) return;
     console.error('Ошибка загрузки карточки клиента:', err);
   }
 }
 
 function closeClientView() {
   clientViewRequest();
-  const modal = document.getElementById('modal-client-view');
+  const modal = byId('modal-client-view', 'div');
   if (modal) modal.style.display = 'none';
 }
 
+/** @param {import('./contracts').Client|null} [client] */
 function openClientEdit(client = null) {
   closeClientView();
   initBirthdaySelectors();
 
-  const modal = document.getElementById('modal-client-edit');
-  const title = document.getElementById('modal-client-edit-title');
-  const idInput = document.getElementById('edit-client-id');
-  const nameInput = document.getElementById('edit-client-name');
-  const bdayDay = document.getElementById('edit-client-bday-day');
-  const bdayMonth = document.getElementById('edit-client-bday-month');
-  const phoneInput = document.getElementById('edit-client-phone');
-  const tgInput = document.getElementById('edit-client-tg');
-  const notesInput = document.getElementById('edit-client-notes');
+  const modal = byId('modal-client-edit', 'div');
+  const title = byId('modal-client-edit-title', 'h3');
+  const idInput = byId('edit-client-id', 'input');
+  const nameInput = byId('edit-client-name', 'input');
+  const bdayDay = byId('edit-client-bday-day', 'select');
+  const bdayMonth = byId('edit-client-bday-month', 'select');
+  const phoneInput = byId('edit-client-phone', 'input');
+  const tgInput = byId('edit-client-tg', 'input');
+  const notesInput = byId('edit-client-notes', 'textarea');
 
   if (client) {
     if (title) title.textContent = 'Редактировать клиента';
-    if (idInput) idInput.value = client.id;
-    if (nameInput) nameInput.value = client.name;
-    if (phoneInput) phoneInput.value = client.phone || '';
-    if (tgInput) tgInput.value = client.telegram || '';
-    if (notesInput) notesInput.value = client.notes || '';
+    if (idInput) idInput.value = String(client.id);
+    if (nameInput) nameInput.value = String(client.name);
+    if (phoneInput) phoneInput.value = String(client.phone || '');
+    if (tgInput) tgInput.value = String(client.telegram || '');
+    if (notesInput) notesInput.value = String(client.notes || '');
 
     if (client.birthday) {
       const [d, m] = client.birthday.split('.');
-      if (bdayDay) bdayDay.value = d || '';
-      if (bdayMonth) bdayMonth.value = m || '';
+      if (bdayDay) bdayDay.value = String(d || '');
+      if (bdayMonth) bdayMonth.value = String(m || '');
     } else {
       if (bdayDay) bdayDay.value = '';
       if (bdayMonth) bdayMonth.value = '';
@@ -291,7 +301,7 @@ function openClientEdit(client = null) {
 }
 
 function closeClientEdit() {
-  const modal = document.getElementById('modal-client-edit');
+  const modal = byId('modal-client-edit', 'div');
   if (modal) modal.style.display = 'none';
 }
 
@@ -300,14 +310,14 @@ function saveClientModal() {
 }
 
 async function performSaveClientModal() {
-  const id = document.getElementById('edit-client-id')?.value;
-  const name = document.getElementById('edit-client-name')?.value?.trim();
-  const phone = document.getElementById('edit-client-phone')?.value?.trim() || null;
-  const telegram = document.getElementById('edit-client-tg')?.value?.trim() || null;
-  const notes = document.getElementById('edit-client-notes')?.value?.trim() || null;
+  const id = byId('edit-client-id', 'input')?.value;
+  const name = byId('edit-client-name', 'input')?.value?.trim();
+  const phone = byId('edit-client-phone', 'input')?.value?.trim() || null;
+  const telegram = byId('edit-client-tg', 'input')?.value?.trim() || null;
+  const notes = byId('edit-client-notes', 'textarea')?.value?.trim() || null;
 
-  const bdayDay = document.getElementById('edit-client-bday-day')?.value;
-  const bdayMonth = document.getElementById('edit-client-bday-month')?.value;
+  const bdayDay = byId('edit-client-bday-day', 'select')?.value;
+  const bdayMonth = byId('edit-client-bday-month', 'select')?.value;
   let birthday = null;
   if (bdayDay && bdayMonth) {
     birthday = `${bdayDay}.${bdayMonth}`;
@@ -360,40 +370,41 @@ async function deleteClientModal() {
 }
 
 // Поиск клиентов в реальном времени
-let clientSearchDebounce = null;
-document.getElementById('input-clients-search')?.addEventListener('input', (e) => {
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let clientSearchDebounce;
+byId('input-clients-search', 'input')?.addEventListener('input', (e) => {
   clearTimeout(clientSearchDebounce);
-  const q = e.target.value;
+  const q = byId('input-clients-search', 'input').value;
   clientSearchDebounce = setTimeout(() => {
     loadClients(q);
   }, 250);
 });
 
 // События кнопок модуля клиентов
-document.getElementById('btn-open-clients')?.addEventListener('click', () => {
+byId('btn-open-clients', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('clients');
   loadClients();
 });
-document.getElementById('btn-back-from-clients')?.addEventListener('click', () => {
+byId('btn-back-from-clients', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('main');
 });
-document.getElementById('btn-add-client')?.addEventListener('click', () => {
+byId('btn-add-client', 'button')?.addEventListener('click', () => {
   haptic('light');
   openClientEdit(null);
 });
-document.getElementById('btn-close-client-view')?.addEventListener('click', closeClientView);
-document.getElementById('btn-close-client-edit')?.addEventListener('click', closeClientEdit);
-document.getElementById('btn-cancel-client-edit')?.addEventListener('click', closeClientEdit);
-document.getElementById('btn-save-client')?.addEventListener('click', saveClientModal);
+byId('btn-close-client-view', 'button')?.addEventListener('click', closeClientView);
+byId('btn-close-client-edit', 'button')?.addEventListener('click', closeClientEdit);
+byId('btn-cancel-client-edit', 'button')?.addEventListener('click', closeClientEdit);
+byId('btn-save-client', 'button')?.addEventListener('click', saveClientModal);
 
-document.getElementById('btn-client-edit')?.addEventListener('click', () => {
+byId('btn-client-edit', 'button')?.addEventListener('click', () => {
   const client = cachedClients.find((c) => c.id === currentViewingClientId);
   if (client) openClientEdit(client);
 });
-document.getElementById('btn-client-delete')?.addEventListener('click', deleteClientModal);
-document.getElementById('btn-client-book')?.addEventListener('click', () => {
+byId('btn-client-delete', 'button')?.addEventListener('click', deleteClientModal);
+byId('btn-client-book', 'button')?.addEventListener('click', () => {
   const client = cachedClients.find((c) => c.id === currentViewingClientId);
   closeClientView();
   haptic('light');

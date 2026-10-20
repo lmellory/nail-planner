@@ -26,6 +26,7 @@ if (tg) {
   tg.onEvent?.('themeChanged', syncTgTheme);
 }
 
+/** @param {'light'|'medium'|'heavy'|'success'|'warning'|'error'} [type] */
 export function haptic(type = 'light') {
   try {
     if (type === 'light' || type === 'medium' || type === 'heavy') {

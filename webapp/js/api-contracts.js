@@ -1,12 +1,13 @@
 import { api } from './api.js';
 
 /**
- * @template {keyof import('./contracts').GetResponses} K
+ * @template {import('./contracts').GetPath} K
  * @param {K} path
- * @returns {Promise<import('./contracts').GetResponses[K]>}
+ * @param {Omit<RequestInit, 'headers'> & {headers?: Record<string, string>}} [options]
+ * @returns {Promise<import('./contracts').GetResponse<K>>}
  */
-export function getApi(path) {
-  return api(path);
+export function getApi(path, options) {
+  return api(path, options);
 }
 
 /**

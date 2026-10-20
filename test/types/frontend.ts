@@ -23,3 +23,20 @@ getApi('/unknown');
 state.pendingWrites = '1';
 const input = formInput('setting-notify-time');
 if (input) input.value = '22:00';
+
+getApi('/appointments?from=2026-01-01&to=2026-12-31').then(appointments => {
+  const price: number | null = appointments[0].price;
+  void price;
+  // @ts-expect-error Статус ограничен значениями, которые принимает сервер.
+  appointments[0].status = 'finished';
+});
+getApi('/clients?q=Анна').then(clients => {
+  // @ts-expect-error ID клиента — число, а не строка.
+  clients[0].id = '123';
+});
+getApi('/stats?period=month&date=2026-01-01').then(report => {
+  const sum: number = report.total;
+  void sum;
+  // @ts-expect-error В корзине дохода нельзя подменить сумму строкой.
+  report.buckets[0].sum = '100';
+});

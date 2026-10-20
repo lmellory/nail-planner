@@ -1,3 +1,4 @@
+import { byId } from './dom.js';
 import { state, todayStr } from './state.js';
 import { updateGreeting } from './greeting.js';
 import { haptic, tg } from './telegram.js';
@@ -16,41 +17,41 @@ if (tg) {
 }
 
 // Кнопка перезапуска при истекшей сессии
-document.getElementById('btn-reload-app')?.addEventListener('click', () => {
+byId('btn-reload-app', 'button')?.addEventListener('click', () => {
   window.location.reload();
 });
 
 // Навигационные кнопки в шапке
-document.getElementById('btn-tab-main')?.addEventListener('click', () => {
+byId('btn-tab-main', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('main');
 });
 
-document.getElementById('btn-open-calendar')?.addEventListener('click', () => {
+byId('btn-open-calendar', 'button')?.addEventListener('click', () => {
   haptic('light');
   openCalendar();
 });
 
-document.getElementById('btn-open-search')?.addEventListener('click', () => {
+byId('btn-open-search', 'button')?.addEventListener('click', () => {
   haptic('light');
   openSearch();
 });
 
-document.getElementById('btn-open-settings')?.addEventListener('click', () => {
+byId('btn-open-settings', 'button')?.addEventListener('click', () => {
   haptic('light');
   openSettings();
 });
 
-document.getElementById('btn-back')?.addEventListener('click', () => {
+byId('btn-back', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('main');
 });
 
-document.getElementById('btn-prev-week')?.addEventListener('click', () => shiftWeek(-7));
+byId('btn-prev-week', 'button')?.addEventListener('click', () => shiftWeek(-7));
 
-document.getElementById('btn-next-week')?.addEventListener('click', () => shiftWeek(7));
+byId('btn-next-week', 'button')?.addEventListener('click', () => shiftWeek(7));
 
-document.getElementById('btn-today')?.addEventListener('click', () => {
+byId('btn-today', 'button')?.addEventListener('click', () => {
   haptic('light');
   selectDate(todayStr);
 });

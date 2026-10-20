@@ -1,3 +1,5 @@
+import { getApi } from './api-contracts.js';
+import { byId } from './dom.js';
 import { state, todayStr } from './state.js';
 import { RU_MONTHS, RU_WEEKDAYS_SHORT, addDays, parseDate } from './dates.js';
 import { confirmDialog, escapeHtml, showToast } from './ui.js';
@@ -14,31 +16,32 @@ import { loadIncome } from './income.js';
 
 async function loadExpenseNames() {
   try {
-    const names = await api('/expenses/names');
-    const list = document.getElementById('expense-names-datalist');
+    const names = await getApi('/expenses/names');
+    const list = byId('expense-names-datalist', 'datalist');
     if (list) list.innerHTML = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
   } catch {}
 }
 
+/** @param {import('./contracts').Expense|null} [expense] */
 function openExpenseEdit(expense = null) {
-  const modal = document.getElementById('modal-expense-edit');
-  document.getElementById('modal-expense-title').textContent = expense ? 'Редактировать трату' : 'Новая трата';
-  document.getElementById('edit-expense-id').value = expense ? expense.id : '';
-  document.getElementById('edit-expense-date').value = expense ? expense.date : todayStr;
-  document.getElementById('edit-expense-name').value = expense ? expense.name : '';
-  document.getElementById('edit-expense-amount').value = expense ? expense.amount : '';
-  document.getElementById('btn-delete-expense').style.display = expense ? 'block' : 'none';
+  const modal = byId('modal-expense-edit', 'div');
+  byId('modal-expense-title', 'h3').textContent = expense ? 'Редактировать трату' : 'Новая трата';
+  byId('edit-expense-id', 'input').value = String(expense ? expense.id : '');
+  byId('edit-expense-date', 'input').value = String(expense ? expense.date : todayStr);
+  byId('edit-expense-name', 'input').value = String(expense ? expense.name : '');
+  byId('edit-expense-amount', 'input').value = String(expense ? expense.amount : '');
+  byId('btn-delete-expense', 'button').style.display = expense ? 'block' : 'none';
   if (modal) modal.style.display = 'flex';
   loadExpenseNames();
   setTimeout(() => {
     // Не перехватываем фокус, если мастер уже перешёл к другому полю окна.
     if (modal?.style.display !== 'flex' || modal.contains(document.activeElement)) return;
-    document.getElementById('edit-expense-name')?.focus();
+    byId('edit-expense-name', 'input')?.focus();
   }, 100);
 }
 
 function closeExpenseEdit() {
-  const modal = document.getElementById('modal-expense-edit');
+  const modal = byId('modal-expense-edit', 'div');
   if (modal) modal.style.display = 'none';
 }
 
@@ -53,10 +56,10 @@ function saveExpense() {
 }
 
 async function performSaveExpense() {
-  const id = document.getElementById('edit-expense-id')?.value;
-  const date = document.getElementById('edit-expense-date')?.value;
-  const name = document.getElementById('edit-expense-name')?.value?.trim();
-  const amountEl = document.getElementById('edit-expense-amount');
+  const id = byId('edit-expense-id', 'input')?.value;
+  const date = byId('edit-expense-date', 'input')?.value;
+  const name = byId('edit-expense-name', 'input')?.value?.trim();
+  const amountEl = byId('edit-expense-amount', 'input');
 
   if (!date) return showToast('Укажите дату');
   if (!name) return showToast('Укажите, на что потрачено');
@@ -79,7 +82,7 @@ async function performSaveExpense() {
 }
 
 function deleteExpenseModal() {
-  const id = document.getElementById('edit-expense-id')?.value;
+  const id = byId('edit-expense-id', 'input')?.value;
   if (!id) return;
   confirmDialog('Удалить эту трату?', async (confirmed) => {
     if (!confirmed) return;
@@ -95,9 +98,10 @@ function deleteExpenseModal() {
   });
 }
 
+/** @param {import('./contracts').Expense[]} items */
 function renderExpensesList(items) {
-  const list = document.getElementById('expenses-list');
-  const totalEl = document.getElementById('expenses-total');
+  const list = byId('expenses-list', 'div');
+  const totalEl = byId('expenses-total', 'div');
   if (!list) return;
   list.innerHTML = '';
   totalEl.textContent = formatMoney(items.reduce((a, x) => a + x.amount, 0));
@@ -106,10 +110,12 @@ function renderExpensesList(items) {
     return;
   }
   // Группируем по дате (список уже отсортирован: новые сверху)
+  /** @type {Map<string, import('./contracts').Expense[]>} */
   const byDate = new Map();
   for (const x of items) {
     if (!byDate.has(x.date)) byDate.set(x.date, []);
-    byDate.get(x.date).push(x);
+    const rows = byDate.get(x.date);
+    if (rows) rows.push(x);
   }
   for (const [date, rows] of byDate) {
     const d = parseDate(date);
@@ -133,27 +139,27 @@ async function loadExpensesList() {
   const d = income.data;
   const from = d ? d.from : state.weekStart;
   const to = d ? d.to : addDays(state.weekStart, 6);
-  document.getElementById('expenses-period-label').textContent = d ? incomePeriodLabel(d) : '';
+  byId('expenses-period-label', 'div').textContent = d ? incomePeriodLabel(d) : '';
   try {
-    renderExpensesList(await api(`/expenses?from=${from}&to=${to}`));
+    renderExpensesList(await getApi(`/expenses?from=${from}&to=${to}`));
   } catch (err) {
     console.error('Ошибка загрузки трат:', err);
   }
 }
 
-document.getElementById('btn-add-expense')?.addEventListener('click', () => { haptic('light'); openExpenseEdit(null); });
-document.getElementById('btn-add-expense-list')?.addEventListener('click', () => { haptic('light'); openExpenseEdit(null); });
-document.getElementById('btn-open-expenses')?.addEventListener('click', () => {
+byId('btn-add-expense', 'button')?.addEventListener('click', () => { haptic('light'); openExpenseEdit(null); });
+byId('btn-add-expense-list', 'button')?.addEventListener('click', () => { haptic('light'); openExpenseEdit(null); });
+byId('btn-open-expenses', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('expenses');
   loadExpensesList();
 });
-document.getElementById('btn-back-from-expenses')?.addEventListener('click', () => {
+byId('btn-back-from-expenses', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('income');
   loadIncome(); // траты могли измениться
 });
-document.getElementById('btn-close-expense-edit')?.addEventListener('click', closeExpenseEdit);
-document.getElementById('btn-cancel-expense-edit')?.addEventListener('click', closeExpenseEdit);
-document.getElementById('btn-save-expense')?.addEventListener('click', saveExpense);
-document.getElementById('btn-delete-expense')?.addEventListener('click', deleteExpenseModal);
+byId('btn-close-expense-edit', 'button')?.addEventListener('click', closeExpenseEdit);
+byId('btn-cancel-expense-edit', 'button')?.addEventListener('click', closeExpenseEdit);
+byId('btn-save-expense', 'button')?.addEventListener('click', saveExpense);
+byId('btn-delete-expense', 'button')?.addEventListener('click', deleteExpenseModal);

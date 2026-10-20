@@ -14,6 +14,7 @@ export const test = base.extend({
   model: async ({ page, isMobile, withTelegram }, use) => {
     const model = {
       appointments: appointments(), writes: [], errors: [], expenses: [], clients: [],
+      latency: {}, failures: {}, requests: [],
       settings: { notify_enabled: true, notify_new_appt: true, notify_time: '22:48', tz: 'Europe/Chisinau', work_start_time: '09:00', work_end_time: '20:00', work_days: '1,2,3', backup_enabled: true },
       prices: { manicure: 250, pedicure: 300, both: 500, manicure_fingers: null },
     };
@@ -35,6 +36,13 @@ export const test = base.extend({
       const request = route.request(), url = new URL(request.url());
       if (url.origin !== 'http://127.0.0.1:4173') { await route.abort(); return; }
       if (!url.pathname.startsWith('/api/')) { await route.continue(); return; }
+      model.requests.push({ method: request.method(), path: url.pathname });
+      if (model.latency[url.pathname]) await new Promise(resolve => setTimeout(resolve, model.latency[url.pathname]));
+      if (model.failures[url.pathname] > 0) {
+        model.failures[url.pathname]--;
+        await route.fulfill({ status: 503, json: { error: 'Тестовая ошибка: попробуйте ещё раз' } });
+        return;
+      }
       const write = !['GET', 'HEAD'].includes(request.method());
       const body = write ? request.postDataJSON() : null;
       let data;

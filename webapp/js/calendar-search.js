@@ -1,8 +1,10 @@
+import { isAbortError } from './requests.js';
+import { getApi } from './api-contracts.js';
+import { byId } from './dom.js';
 import { requestGate } from './requests.js';
 import { RU_MONTHS_NOM, fmt, formatApptTime, formatFullDateRu, pad, parseDate } from './dates.js';
 import { state, todayStr } from './state.js';
 import { goScreen } from './navigation.js';
-import { api } from './api.js';
 import { haptic } from './telegram.js';
 import { inactiveClass, selectDate, statusBadgeHtml } from './schedule.js';
 import { serviceName } from './labels.js';
@@ -28,8 +30,8 @@ export function openCalendar() {
 export async function renderCalendar() {
   const request = calendarRequest();
   const year = state.calendarYear, month = state.calendarMonth;
-  const titleEl = document.getElementById('cal-month-title');
-  const gridEl = document.getElementById('calendar-grid');
+  const titleEl = byId('cal-month-title', 'h2');
+  const gridEl = byId('calendar-grid', 'div');
   if (!gridEl) return;
 
   if (titleEl) {
@@ -46,10 +48,10 @@ export async function renderCalendar() {
 
   let monthSummary = new Map();
   try {
-    const summary = await api(`/days?from=${fromStr}&to=${toStr}`, { signal: request.signal });
+    const summary = await getApi(`/days?from=${fromStr}&to=${toStr}`, { signal: request.signal });
     for (const item of summary) monthSummary.set(item.date, item);
   } catch (error) {
-    if (error.name === 'AbortError') return;
+    if (isAbortError(error)) return;
     console.error('Ошибка загрузки календаря', error);
   }
   if (!request.current() || year !== state.calendarYear || month !== state.calendarMonth) return;
@@ -102,7 +104,7 @@ export async function renderCalendar() {
   }
 }
 
-document.getElementById('btn-cal-prev-month')?.addEventListener('click', () => {
+byId('btn-cal-prev-month', 'button')?.addEventListener('click', () => {
   haptic('light');
   state.calendarMonth--;
   if (state.calendarMonth < 0) {
@@ -117,7 +119,7 @@ document.getElementById('btn-cal-prev-month')?.addEventListener('click', () => {
   renderCalendar();
 });
 
-document.getElementById('btn-cal-next-month')?.addEventListener('click', () => {
+byId('btn-cal-next-month', 'button')?.addEventListener('click', () => {
   haptic('light');
   state.calendarMonth++;
   if (state.calendarMonth > 11) {
@@ -132,7 +134,7 @@ document.getElementById('btn-cal-next-month')?.addEventListener('click', () => {
   renderCalendar();
 });
 
-document.getElementById('btn-cal-goto-today')?.addEventListener('click', () => {
+byId('btn-cal-goto-today', 'button')?.addEventListener('click', () => {
   haptic('light');
   selectDate(todayStr);
   goScreen('main');
@@ -140,16 +142,17 @@ document.getElementById('btn-cal-goto-today')?.addEventListener('click', () => {
 
 // ===== 5. ПОИСК КЛИЕНТОВ =====
 
-let searchDebounceTimer = null;
+/** @type {ReturnType<typeof setTimeout> | undefined} */
+let searchDebounceTimer;
 
 export function openSearch() {
   clearTimeout(searchDebounceTimer);
   searchSequence++;
   searchRequest();
-  const input = document.getElementById('search-input');
-  const clearBtn = document.getElementById('btn-search-clear');
-  const resultsEl = document.getElementById('search-results-list');
-  const hintEl = document.getElementById('search-hint');
+  const input = byId('search-input', 'input');
+  const clearBtn = byId('btn-search-clear', 'button');
+  const resultsEl = byId('search-results-list', 'div');
+  const hintEl = byId('search-hint', 'div');
 
   if (input) input.value = '';
   if (clearBtn) clearBtn.style.display = 'none';
@@ -163,11 +166,11 @@ export function openSearch() {
   setTimeout(() => input?.focus(), 100);
 }
 
-document.getElementById('search-input')?.addEventListener('input', (e) => {
-  const val = e.target.value.trim();
-  const clearBtn = document.getElementById('btn-search-clear');
-  const hintEl = document.getElementById('search-hint');
-  const resultsEl = document.getElementById('search-results-list');
+byId('search-input', 'input')?.addEventListener('input', (e) => {
+  const val = byId('search-input', 'input').value.trim();
+  const clearBtn = byId('btn-search-clear', 'button');
+  const hintEl = byId('search-hint', 'div');
+  const resultsEl = byId('search-results-list', 'div');
 
   if (clearBtn) clearBtn.style.display = val ? 'block' : 'none';
 
@@ -187,38 +190,39 @@ document.getElementById('search-input')?.addEventListener('input', (e) => {
 
   searchDebounceTimer = setTimeout(async () => {
     try {
-      const results = await api(`/search?q=${encodeURIComponent(val)}`, { signal: request.signal });
+      const results = await getApi(`/search?q=${encodeURIComponent(val)}`, { signal: request.signal });
       if (!request.current() || sequence !== searchSequence) return;
       renderSearchResults(results);
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (isAbortError(err)) return;
       console.error('Ошибка поиска:', err);
     }
   }, 250);
 });
 
-document.getElementById('btn-search-clear')?.addEventListener('click', () => {
+byId('btn-search-clear', 'button')?.addEventListener('click', () => {
   clearTimeout(searchDebounceTimer);
   searchSequence++;
   searchRequest();
-  const input = document.getElementById('search-input');
+  const input = byId('search-input', 'input');
   if (input) {
     input.value = '';
     input.focus();
   }
-  const clearBtn = document.getElementById('btn-search-clear');
+  const clearBtn = byId('btn-search-clear', 'button');
   if (clearBtn) clearBtn.style.display = 'none';
-  const resultsEl = document.getElementById('search-results-list');
+  const resultsEl = byId('search-results-list', 'div');
   if (resultsEl) resultsEl.innerHTML = '';
-  const hintEl = document.getElementById('search-hint');
+  const hintEl = byId('search-hint', 'div');
   if (hintEl) {
     hintEl.style.display = 'block';
     hintEl.textContent = 'Введите минимум 2 буквы для поиска';
   }
 });
 
+/** @param {import('./contracts').Appointment[]} items */
 function renderSearchResults(items) {
-  const resultsEl = document.getElementById('search-results-list');
+  const resultsEl = byId('search-results-list', 'div');
   if (!resultsEl) return;
 
   if (!items || !items.length) {

@@ -1,3 +1,5 @@
+import { getApi } from './api-contracts.js';
+import { byId, all } from './dom.js';
 import { todayStr } from './state.js';
 import { RU_MONTHS, RU_MONTHS_NOM, RU_WEEKDAYS_SHORT, addDays, fmt, parseDate } from './dates.js';
 import { escapeHtml, showToast } from './ui.js';
@@ -12,12 +14,14 @@ import { income, incomePeriodLabel } from './finance-state.js';
 // ===== ДОХОДЫ =====
 const RU_MONTHS_SHORT = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
 
+/** @param {import('./contracts').Period} period @param {import('./contracts').Bucket} bucket */
 function incomeBucketTitle(period, bucket) {
   const d = parseDate(bucket.from);
   if (period === 'year') return `${RU_MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`;
   return `${RU_WEEKDAYS_SHORT[(d.getDay() + 6) % 7]}, ${d.getDate()} ${RU_MONTHS[d.getMonth()]}`;
 }
 
+/** @param {import('./contracts').Period} period @param {number} index @param {number} total */
 function incomeAxisLabel(period, index, total) {
   if (period === 'week') return RU_WEEKDAYS_SHORT[index];
   if (period === 'year') return RU_MONTHS_SHORT[index];
@@ -26,15 +30,18 @@ function incomeAxisLabel(period, index, total) {
   return day === total && total % 5 >= 3 ? String(day) : '';
 }
 
+/** @param {number} n */
 function unpricedPhrase(n) {
   const word = n % 10 === 1 && n % 100 !== 11 ? 'записи' : 'записей';
   return `У ${n} ${word} не указана цена — они не входят в доходы.`;
 }
 
+/** @param {import('./contracts').Bucket} b */
 const incomeValue = (b) => (income.metric === 'expense' ? b.expense : b.sum);
 
+/** @param {import('./contracts').IncomeReport} d */
 function renderIncomeMaterials(d) {
-  const box = document.getElementById('income-materials');
+  const box = byId('income-materials', 'div');
   if (!box) return;
   box.innerHTML = '';
   const list = d.materials || [];
@@ -70,17 +77,17 @@ function renderIncomeSummary() {
   const isExp = income.metric === 'expense';
   const selected = income.selectedKey ? d.buckets.find((b) => b.key === income.selectedKey) : null;
 
-  document.getElementById('income-period-label').textContent = incomePeriodLabel(d);
-  document.getElementById('income-focus-label').textContent = selected
+  byId('income-period-label', 'div').textContent = incomePeriodLabel(d);
+  byId('income-focus-label', 'div').textContent = selected
     ? incomeBucketTitle(d.period, selected)
     : (isExp
         ? { week: 'Траты за неделю', month: 'Траты за месяц', year: 'Траты за год' }
         : { week: 'Доход за неделю', month: 'Доход за месяц', year: 'Доход за год' })[d.period];
-  document.getElementById('income-total-value').textContent =
+  byId('income-total-value', 'div').textContent =
     formatMoney(selected ? incomeValue(selected) : (isExp ? d.total_expense : d.total));
 
   // Динамика к прошлому периоду: рост дохода — хорошо (зелёный), рост трат — плохо (красный)
-  const deltaEl = document.getElementById('income-delta');
+  const deltaEl = byId('income-delta', 'div');
   deltaEl.className = 'income-delta';
   const cur = isExp ? d.total_expense : d.total;
   const prev = isExp ? d.prev_expense : d.prev_total;
@@ -104,16 +111,16 @@ function renderIncomeSummary() {
   }
 
   // Итог периода: доход, траты, прибыль
-  document.getElementById('income-sum-income').textContent = formatMoney(d.total);
-  document.getElementById('income-sum-expense').textContent = formatMoney(d.total_expense);
-  const profitEl = document.getElementById('income-sum-profit');
+  byId('income-sum-income', 'div').textContent = formatMoney(d.total);
+  byId('income-sum-expense', 'div').textContent = formatMoney(d.total_expense);
+  const profitEl = byId('income-sum-profit', 'div');
   profitEl.textContent = formatMoney(d.profit);
   profitEl.className = 'income-stat-value' + (d.profit > 0 ? ' is-plus' : d.profit < 0 ? ' is-minus' : '');
 
-  document.getElementById('income-stat-count').textContent = String(d.paid);
-  document.getElementById('income-stat-avg').textContent = d.paid ? formatMoney(d.avg) : '—';
+  byId('income-stat-count', 'div').textContent = String(d.paid);
+  byId('income-stat-avg', 'div').textContent = d.paid ? formatMoney(d.avg) : '—';
 
-  const noteEl = document.getElementById('income-note');
+  const noteEl = byId('income-note', 'div');
   if (d.unpaid > 0) {
     noteEl.textContent = unpricedPhrase(d.unpaid);
     noteEl.style.display = 'block';
@@ -124,7 +131,7 @@ function renderIncomeSummary() {
     noteEl.style.display = 'none';
   }
 
-  const extraEl = document.getElementById('income-extra');
+  const extraEl = byId('income-extra', 'div');
   if (extraEl) {
     const lines = [];
     if (d.expected > 0) {
@@ -144,8 +151,8 @@ function renderIncomeSummary() {
 
 function renderIncomeChart() {
   const d = income.data;
-  const chart = document.getElementById('income-chart');
-  const axis = document.getElementById('income-axis');
+  const chart = byId('income-chart', 'div');
+  const axis = byId('income-axis', 'div');
   if (!d || !chart || !axis) return;
 
   const cols = `repeat(${d.buckets.length}, minmax(0, 1fr))`;
@@ -158,6 +165,7 @@ function renderIncomeChart() {
 
   const max = Math.max(0, ...d.buckets.map(incomeValue));
   const nowKey = d.period === 'year' ? todayStr.slice(0, 7) : todayStr;
+  /** @type {HTMLDivElement[]} */
   const fills = [];
 
   d.buckets.forEach((b, i) => {
@@ -182,7 +190,7 @@ function renderIncomeChart() {
     bar.addEventListener('click', () => {
       haptic('light');
       income.selectedKey = income.selectedKey === b.key ? null : b.key;
-      chart.querySelectorAll('.income-bar').forEach((el) => {
+      all('.income-bar', chart).forEach((el) => {
         el.classList.toggle('is-selected', el.dataset.key === income.selectedKey);
       });
       renderIncomeSummary();
@@ -196,7 +204,7 @@ function renderIncomeChart() {
   });
 
   // Плавное «вырастание» столбиков
-  const grow = () => fills.forEach((f) => { f.style.height = f.dataset.target; });
+  const grow = () => fills.forEach((f) => { f.style.height = f.dataset.target || '0%'; });
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(grow));
   else grow();
 }
@@ -209,7 +217,7 @@ function renderIncome() {
 export async function loadIncome() {
   const reqId = ++income.requestId;
   try {
-    const data = await api(`/stats?period=${income.period}&date=${income.anchor}`);
+    const data = await getApi(`/stats?period=${income.period}&date=${income.anchor}`);
     if (reqId !== income.requestId) return; // пока грузилось, пользователь переключил период
     income.data = data;
     income.selectedKey = null;
@@ -219,6 +227,7 @@ export async function loadIncome() {
   }
 }
 
+/** @param {number} dir */
 function shiftIncomeAnchor(dir) {
   if (income.period === 'week') {
     income.anchor = addDays(income.anchor, 7 * dir);
@@ -231,36 +240,40 @@ function shiftIncomeAnchor(dir) {
   income.anchor = fmt(d);
 }
 
-document.getElementById('btn-open-income')?.addEventListener('click', () => {
+byId('btn-open-income', 'button')?.addEventListener('click', () => {
   haptic('light');
   income.anchor = todayStr;
   goScreen('income');
   loadIncome();
 });
-document.getElementById('btn-back-from-income')?.addEventListener('click', () => {
+byId('btn-back-from-income', 'button')?.addEventListener('click', () => {
   haptic('light');
   goScreen('main');
 });
-document.querySelectorAll('#income-period-selector .segment-btn').forEach((btn) => {
+all('#income-period-selector .segment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     haptic('light');
     if (btn.dataset.period === income.period) income.anchor = todayStr; // повторное нажатие — к текущему периоду
-    income.period = btn.dataset.period;
-    document.querySelectorAll('#income-period-selector .segment-btn').forEach((b) => {
+    const period = btn.dataset.period;
+    if (period !== 'week' && period !== 'month' && period !== 'year') return;
+    income.period = period;
+    all('#income-period-selector .segment-btn').forEach((b) => {
       b.classList.toggle('active', b === btn);
     });
     loadIncome();
   });
 });
-document.getElementById('btn-income-prev')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(-1); loadIncome(); });
-document.getElementById('btn-income-next')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(1); loadIncome(); });
+byId('btn-income-prev', 'button')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(-1); loadIncome(); });
+byId('btn-income-next', 'button')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(1); loadIncome(); });
 
-document.querySelectorAll('#income-metric-selector .segment-btn').forEach((btn) => {
+all('#income-metric-selector .segment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     haptic('light');
-    income.metric = btn.dataset.metric;
+    const metric = btn.dataset.metric;
+    if (metric !== 'income' && metric !== 'expense') return;
+    income.metric = metric;
     income.selectedKey = null;
-    document.querySelectorAll('#income-metric-selector .segment-btn').forEach((b) => {
+    all('#income-metric-selector .segment-btn').forEach((b) => {
       b.classList.toggle('active', b === btn);
     });
     renderIncome();
@@ -271,6 +284,7 @@ async function exportFinance() {
   haptic('light');
   showToast('Формируем файл и отправляем в чат…');
   try {
+/** @type {{ok:boolean}} */
     const res = await api('/export/finance', {
       method: 'POST',
       body: JSON.stringify({ period: income.period, date: income.anchor }),
@@ -284,4 +298,4 @@ async function exportFinance() {
   }
 }
 
-document.getElementById('btn-export-finance')?.addEventListener('click', exportFinance);
+byId('btn-export-finance', 'button')?.addEventListener('click', exportFinance);

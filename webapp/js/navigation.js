@@ -1,28 +1,30 @@
+import { byId, all } from './dom.js';
 import { state } from './state.js';
 import { updateGreeting } from './greeting.js';
 import { tg } from './telegram.js';
 
 // ===== Управление экранами =====
+/** @param {import('./contracts').Screen} name */
 export function goScreen(name) {
   state.currentScreen = name;
   const showTabs = ['main', 'clients', 'income', 'settings'].includes(name);
-  const bottomNav = document.getElementById('bottom-nav');
+  const bottomNav = byId('bottom-nav', 'nav');
   if (bottomNav) bottomNav.hidden = !showTabs;
   document.body.classList.toggle('has-bottom-nav', showTabs);
-  document.querySelectorAll('#bottom-nav .nav-tab').forEach(tab => {
+  all('#bottom-nav .nav-tab').forEach(tab => {
     const active = tab.dataset.screen === name;
     tab.classList.toggle('active', active);
     if (active) tab.setAttribute('aria-current', 'page');
     else tab.removeAttribute('aria-current');
   });
-  document.querySelectorAll('.screen').forEach((el) => el.classList.remove('active'));
+  all('.screen').forEach((el) => el.classList.remove('active'));
 
   const target = document.getElementById(`screen-${name}`);
   if (target) target.classList.add('active');
 
-  const backBtn = document.getElementById('btn-back');
-  const headerActions = document.getElementById('header-actions');
-  const headerTitle = document.getElementById('header-title');
+  const backBtn = byId('btn-back', 'button');
+  const headerActions = byId('header-actions', 'div');
+  const headerTitle = byId('header-title', 'h1');
 
   if (name === 'main') {
     updateGreeting();

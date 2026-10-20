@@ -1,3 +1,5 @@
+import { getApi } from './api-contracts.js';
+import { byId, all } from './dom.js';
 import { api } from './api.js';
 import { state, todayStr } from './state.js';
 import { escapeHtml, showToast } from './ui.js';
@@ -15,21 +17,23 @@ import { haptic } from './telegram.js';
 
 export async function loadMe() {
   try {
-    const me = await api('/me');
+    const me = await getApi('/me');
     state.isAdmin = !!me.is_admin;
   } catch {
     state.isAdmin = false;
   }
-  const btn = document.getElementById('btn-open-admin');
+  const btn = byId('btn-open-admin', 'button');
   if (btn) btn.style.display = state.isAdmin ? '' : 'none';
 }
 
+/** @param {import('./contracts').MasterRow} m */
 function masterLabel(m) {
   return m.name || (m.username ? '@' + m.username : 'ID ' + m.user_id);
 }
 
+/** @param {import('./contracts').MasterRow[]} masters */
 function renderAdminMasters(masters) {
-  const list = document.getElementById('admin-masters-list');
+  const list = byId('admin-masters-list', 'div');
   if (!list) return;
   if (!masters.length) {
     list.innerHTML = '<div class="empty-state">Мастеров пока нет</div>';
@@ -54,7 +58,7 @@ function renderAdminMasters(masters) {
         </div>`;
     })
     .join('');
-  list.querySelectorAll('.admin-master-card').forEach((el) => {
+  all('.admin-master-card', list).forEach((el) => {
     el.addEventListener('click', () => {
       const m = masters.find((x) => String(x.user_id) === el.dataset.id);
       if (m) enterActAs(m);
@@ -64,10 +68,10 @@ function renderAdminMasters(masters) {
 
 async function openAdmin() {
   goScreen('admin');
-  const list = document.getElementById('admin-masters-list');
+  const list = byId('admin-masters-list', 'div');
   if (list) list.innerHTML = '<div class="empty-state">Загрузка…</div>';
   try {
-    const data = await api('/admin/masters');
+    const data = await getApi('/admin/masters');
     renderAdminMasters(data.masters || []);
   } catch {
     if (list) list.innerHTML = '<div class="empty-state">Не удалось загрузить список мастеров</div>';
@@ -96,14 +100,16 @@ async function reloadScheduleData() {
   await loadSelectedDay();
 }
 
+/** @param {boolean} on */
 function setActAsUI(on) {
   document.body.classList.toggle('acting-as', on);
-  const banner = document.getElementById('act-as-banner');
-  const label = document.getElementById('act-as-label');
+  const banner = byId('act-as-banner', 'div');
+  const label = byId('act-as-label', 'b');
   if (label) label.textContent = on ? state.actAsLabel : '';
   if (banner) banner.style.display = on ? 'flex' : 'none';
 }
 
+/** @param {import('./contracts').MasterRow} master */
 async function enterActAs(master) {
   if (state.pendingWrites) return showToast('Дождитесь завершения сохранения');
   haptic('medium');
@@ -126,8 +132,8 @@ async function exitActAs() {
   await reloadScheduleData();
 }
 
-document.getElementById('btn-open-admin')?.addEventListener('click', () => {
+byId('btn-open-admin', 'button')?.addEventListener('click', () => {
   haptic('light');
   openAdmin();
 });
-document.getElementById('btn-act-as-exit')?.addEventListener('click', exitActAs);
+byId('btn-act-as-exit', 'button')?.addEventListener('click', exitActAs);
