@@ -100,7 +100,7 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   /* Отступ принадлежит содержимому, поэтому последнюю карточку можно прокрутить выше меню. */
-  padding-bottom: calc(var(--bottom-nav-inset) + 90px);
+  padding-bottom: calc(var(--bottom-nav-inset) + 16px);
 }
 
 /* --------------------------------------------------------------------------

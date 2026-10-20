@@ -1,7 +1,6 @@
 import { state, todayStr } from './state.js';
 import { updateGreeting } from './greeting.js';
 import { haptic, tg } from './telegram.js';
-import { saveAppointment } from './appointment-form.js';
 import { openSettings, saveDayNote } from './notes-settings.js';
 import { openCalendar, openSearch } from './calendar-search.js';
 import { selectDate, shiftWeek } from './schedule.js';
@@ -11,8 +10,7 @@ import { goScreen } from './navigation.js';
 if (tg) {
   tg.BackButton?.onClick(() => goScreen('main'));
   tg.MainButton?.onClick(() => {
-    if (state.currentScreen === 'form') saveAppointment();
-    else if (state.currentScreen === 'note') saveDayNote();
+    if (state.currentScreen === 'note') saveDayNote();
   });
 }
 

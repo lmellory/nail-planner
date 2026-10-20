@@ -38,14 +38,8 @@ export function goScreen(name) {
 
     if (name === 'form') {
       if (headerTitle) headerTitle.textContent = state.editingAppointmentId ? 'Редактирование' : 'Новая запись';
-      if (tg?.MainButton) {
-        tg.MainButton.setParams({
-          text: 'Сохранить запись',
-          color: '#d86e88',
-          text_color: '#ffffff',
-          is_visible: true,
-        });
-      }
+      // Сохранение находится в форме: нативная кнопка Telegram дублировала его.
+      tg?.MainButton?.hide();
     } else if (name === 'calendar') {
       if (headerTitle) headerTitle.textContent = 'Календарь';
       tg?.MainButton?.hide();
