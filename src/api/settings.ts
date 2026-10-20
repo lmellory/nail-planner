@@ -1,28 +1,20 @@
 // Настройки пользователя: GET/PUT /api/settings
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
-import { ensureUser, updateUserSettings } from '../db';
+import { ensureUser, updateUserSettings } from '../db/users';
 import { isTime } from '../lib/time';
+import { settingsView, validateSchedule } from '../lib/settings';
 
 export const settings = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
 settings.get('/', async (c) => {
   const u = await ensureUser(c.env.DB, c.get('userId'), c.env.TZ);
-  return c.json({
-    notify_enabled: !!u.notify_enabled,
-    notify_time: u.notify_time,
-    tz: u.tz,
-    notify_new_appt: !!u.notify_new_appt,
-    work_start_time: u.work_start_time || '09:00',
-    work_end_time: u.work_end_time || '20:00',
-    work_days: u.work_days || '1,2,3,4,5,6',
-    backup_enabled: u.backup_enabled !== 0,
-  });
+  return c.json(settingsView(u));
 });
 
 settings.put('/', async (c) => {
   const body = await c.req.json().catch(() => null);
-  if (!body || typeof body !== 'object') {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return c.json({ error: 'Некорректное тело запроса' }, 400);
   }
 
@@ -73,6 +65,8 @@ settings.put('/', async (c) => {
 
   const userId = c.get('userId');
   const current = await ensureUser(c.env.DB, userId, c.env.TZ);
+  const scheduleError = validateSchedule(work_start_time ?? current.work_start_time ?? '09:00', work_end_time ?? current.work_end_time ?? '20:00', work_days ?? current.work_days ?? '1,2,3,4,5,6');
+  if (scheduleError) return c.json({ error: scheduleError }, 400);
   const updated = await updateUserSettings(c.env.DB, userId, {
     notify_enabled,
     notify_time,
@@ -84,14 +78,5 @@ settings.put('/', async (c) => {
     backup_enabled: backup_enabled === undefined ? current.backup_enabled : backup_enabled,
   });
 
-  return c.json({
-    notify_enabled: !!updated.notify_enabled,
-    notify_time: updated.notify_time,
-    tz: updated.tz,
-    notify_new_appt: !!updated.notify_new_appt,
-    work_start_time: updated.work_start_time || '09:00',
-    work_end_time: updated.work_end_time || '20:00',
-    work_days: updated.work_days || '1,2,3,4,5,6',
-    backup_enabled: updated.backup_enabled !== 0,
-  });
+  return c.json(settingsView(updated));
 });

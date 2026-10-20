@@ -1,7 +1,9 @@
 // Экспорт данных пользователя: CSV (UTF-8 с BOM, разделитель «;»), JSON и отправка в чат ботом
 import { Hono, type Context } from 'hono';
 import type { Appointment, AppVars, Env, Expense } from '../types';
-import { ensureUser, getAllAppointments, listAppointments, listExpenses } from '../db';
+import { ensureUser } from '../db/users';
+import { getAllAppointments, listAppointments } from '../db/appointments';
+import { listExpenses } from '../db/expenses';
 import { buildJsonBackup } from '../lib/backup';
 import { isPeriod, periodRange } from '../lib/stats';
 import { isHeld, STATUS_LABELS_RU } from '../lib/status';

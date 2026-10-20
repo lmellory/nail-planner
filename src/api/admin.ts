@@ -6,7 +6,8 @@
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
 import { parseInitDataUser } from '../auth';
-import { getUserNames, listUsersAdmin, saveUserName } from '../db';
+import { getUserNames, saveUserName } from '../db/users';
+import { listUsersAdmin } from '../db/admin';
 import { getAccessSnapshot, isAdmin } from '../lib/access';
 import { nowInTz } from '../lib/time';
 

@@ -2,14 +2,8 @@
 // date — любая дата внутри нужного периода (по умолчанию «сегодня» в часовом поясе мастера).
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
-import {
-  ensureUser,
-  getExpectedIncome,
-  getExpensesByDay,
-  getExpensesByName,
-  getIncomeByDay,
-  getStatusCounts,
-} from '../db';
+import { ensureUser } from '../db/users';
+import { getExpectedIncome, getExpensesByDay, getExpensesByName, getIncomeByDay, getStatusCounts } from '../db/reports';
 import { isDate, nowInTz } from '../lib/time';
 import { buildIncomeReport, isPeriod, periodRange, previousRange } from '../lib/stats';
 

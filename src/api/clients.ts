@@ -1,13 +1,8 @@
 import { Hono } from 'hono';
+import { cleanBirthday, parseClientPayload } from '../lib/clients';
+export { cleanBirthday };
 import type { AppVars, Env } from '../types';
-import {
-  deleteClient,
-  getClient,
-  getClientAppointments,
-  insertClient,
-  listClients,
-  updateClient,
-} from '../db';
+import { deleteClient, getClient, getClientAppointments, insertClient, listClients, updateClient } from '../db/clients';
 
 export const clients = new Hono<{ Bindings: Env; Variables: AppVars }>();
 
@@ -32,38 +27,13 @@ clients.get('/:id', async (c) => {
   return c.json({ client, history });
 });
 
-export function cleanBirthday(val: unknown): string | null {
-  if (val === null || val === undefined) return null;
-  const s = String(val).trim();
-  if (!s) return null;
-  const m = s.match(/^(\d{1,2})[.-](\d{1,2})$/);
-  if (!m) return null;
-  const day = Number(m[1]);
-  const month = Number(m[2]);
-  if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-  return `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}`;
-}
-
 // POST /api/clients
 clients.post('/', async (c) => {
   const userId = c.get('userId');
-  const body: any = await c.req.json().catch(() => null);
-  const name = String(body?.name ?? '').trim();
-  if (!name) return c.json({ error: 'Имя клиента обязательно' }, 400);
-
-  let bday: string | null = null;
-  if (body?.birthday) {
-    bday = cleanBirthday(body.birthday);
-    if (!bday) return c.json({ error: 'Некорректный день рождения (укажи число и месяц, например 15.03)' }, 400);
-  }
-
-  const id = await insertClient(c.env.DB, userId, {
-    name: name.slice(0, 100),
-    phone: body?.phone ? String(body.phone).trim().slice(0, 50) : null,
-    telegram: body?.telegram ? String(body.telegram).trim().slice(0, 50) : null,
-    notes: body?.notes ? String(body.notes).trim().slice(0, 1000) : null,
-    birthday: bday,
-  });
+  const parsed = parseClientPayload(await c.req.json().catch(() => null));
+  if (!parsed.data) return c.json({ error: parsed.error }, 400);
+  if (parsed.invalidTelegram) return c.json({ error: 'Некорректный username Telegram' }, 400);
+  const id = await insertClient(c.env.DB, userId, parsed.data);
 
   return c.json({ ok: true, id }, 201);
 });
@@ -74,25 +44,16 @@ clients.put('/:id', async (c) => {
   const id = Number(c.req.param('id'));
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'bad id' }, 400);
 
-  const body: any = await c.req.json().catch(() => null);
-  const name = String(body?.name ?? '').trim();
-  if (!name) return c.json({ error: 'Имя клиента обязательно' }, 400);
-
-  let bday: string | null = null;
-  if (body?.birthday) {
-    bday = cleanBirthday(body.birthday);
-    if (!bday) return c.json({ error: 'Некорректный день рождения (укажи число и месяц, например 15.03)' }, 400);
-  }
-
-  const ok = await updateClient(c.env.DB, userId, id, {
-    name: name.slice(0, 100),
-    phone: body?.phone ? String(body.phone).trim().slice(0, 50) : null,
-    telegram: body?.telegram ? String(body.telegram).trim().slice(0, 50) : null,
-    notes: body?.notes ? String(body.notes).trim().slice(0, 1000) : null,
-    birthday: bday,
+  const current = await getClient(c.env.DB, userId, id);
+  if (!current) return c.json({ error: 'not found' }, 404);
+  const parsed = parseClientPayload(await c.req.json().catch(() => null));
+  if (!parsed.data) return c.json({ error: parsed.error }, 400);
+  if (parsed.invalidTelegram && parsed.rawTelegram !== current.telegram) return c.json({ error: 'Некорректный username Telegram' }, 400);
+  const result = await updateClient(c.env.DB, userId, id, {
+    ...parsed.data, telegram: parsed.invalidTelegram ? current.telegram : parsed.data.telegram,
   });
-
-  if (!ok) return c.json({ error: 'not found' }, 404);
+  if (result === 'not_found') return c.json({ error: 'not found' }, 404);
+  if (result === 'name_taken') return c.json({ error: 'Клиент с таким именем уже существует' }, 409);
   return c.json({ ok: true });
 });
 

@@ -2,13 +2,8 @@
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
 import { isDate, weekdayRu } from '../lib/time';
-import {
-  NEW_APPT_MSG_TTL_SEC,
-  deleteDayNote,
-  getDayNote,
-  scheduleMessageDelete,
-  upsertDayNote,
-} from '../db';
+import { NEW_APPT_MSG_TTL_SEC, scheduleMessageDelete } from '../db/notifications';
+import { deleteDayNote, getDayNote, upsertDayNote } from '../db/notes';
 import { escapeHtml, sendMessage } from '../bot/telegram';
 
 export const notes = new Hono<{ Bindings: Env; Variables: AppVars }>();

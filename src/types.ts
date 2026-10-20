@@ -1,6 +1,9 @@
+/** Только операции, которые реализует адаптер Turso и использует приложение. */
+export type Database = Pick<D1Database, 'prepare' | 'batch' | 'exec'>;
+
 // Общие типы проекта
 export interface Env {
-  DB: D1Database;
+  DB: Database;
   ASSETS: Fetcher;
   BOT_TOKEN: string;       // secret
   ALLOWED_IDS: string;     // secret: "123,456"
@@ -16,7 +19,7 @@ export interface Env {
 
 import type { Status } from './lib/status';
 
-export type Service = 'manicure' | 'pedicure' | 'both' | 'manicure_fingers' | 'fingers';
+export type Service = typeof import('./lib/services').SERVICES[number];
 export type Coating = 'gel' | 'none';
 
 export interface Appointment {
@@ -24,7 +27,7 @@ export interface Appointment {
   user_id: number;
   date: string;
   start_time: string;
-  end_time: string | null; // у новых записей null, у старых может быть значение
+  end_time: string | null; // null допускается для совместимости со старыми записями
   client_name: string;
   who: string | null;
   service: Service;

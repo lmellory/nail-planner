@@ -1,3 +1,4 @@
+import { asRecord } from '../lib/validation';
 // Траты на материалы: CRUD + подсказки названий.
 //   GET    /api/expenses?from=&to=   — список за период (новые сверху)
 //   GET    /api/expenses/names       — ранее использованные названия (для подсказок)
@@ -6,14 +7,7 @@
 //   DELETE /api/expenses/:id         — удалить
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
-import {
-  deleteExpense,
-  getExpense,
-  insertExpense,
-  listExpenseNames,
-  listExpenses,
-  updateExpense,
-} from '../db';
+import { deleteExpense, getExpense, insertExpense, listExpenseNames, listExpenses, updateExpense } from '../db/expenses';
 import { isDate } from '../lib/time';
 import { parseAmount } from '../lib/money';
 import { normalizeName } from '../lib/text';
@@ -23,7 +17,8 @@ export const expenses = new Hono<{ Bindings: Env; Variables: AppVars }>();
 export { normalizeName };
 
 /** Проверка тела запроса. Возвращает [данные, ошибка]. */
-export function validateExpense(b: any) {
+export function validateExpense(input: unknown) {
+  const b = asRecord(input);
   if (!isDate(b?.date)) return [null, 'Некорректная дата'] as const;
   const name = normalizeName(b?.name);
   if (!name) return [null, 'Укажи, на что потрачено'] as const;

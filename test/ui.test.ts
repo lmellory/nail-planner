@@ -1,18 +1,24 @@
-// Сквозные тесты экранов: настоящий webapp/app.js в jsdom ⇄ настоящие обработчики ⇄ настоящая SQLite.
+import { loadFrontend } from './helpers/frontend';
+// Сквозные тесты экранов: скрипты из index.html в jsdom ⇄ настоящие обработчики ⇄ настоящая SQLite.
 // Сценарий последовательный: тесты внутри файла идут по порядку и делят одну базу и один «браузер».
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
-import { api, createTestDb, makeEnv, NOW, OWNER, seedWeek, signInitData, stubTelegram, type TgCall } from './helpers/harness';
+import { api, createTestDb, makeEnv, NOW, OTHER, OWNER, seedWeek, signInitData, stubTelegram, type TgCall } from './helpers/harness';
 
 const read = (f: string) => readFileSync(fileURLToPath(new URL('../webapp/' + f, import.meta.url)), 'utf8');
+const appFiles = () => [...read('index.html').matchAll(/<script\b[^>]*\bsrc="(\/(?!\/)[^"]+)"[^>]*><\/script>/g)]
+  .map((m) => m[1].split('?')[0].slice(1));
 
 let w: any;
+let modules: Awaited<ReturnType<typeof loadFrontend>>;
+let dom: JSDOM;
 let env: any;
 let tg: TgCall[];
 let closeDb: () => void;
+let mainButtonClick: () => void;
 const errors: string[] = [];
 
 const $ = (s: string): any => w.document.querySelector(s);
@@ -34,11 +40,21 @@ beforeAll(async () => {
   await seedWeek(env); // неделя 12–18 окт с записями, срывами и тратами
 
   const html = read('index.html').replace(/<script[^>]*src=[^>]*><\/script>/g, '');
-  const dom = new JSDOM(html, { runScripts: 'outside-only', pretendToBeVisual: true, url: 'https://app.test/' });
+  dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://app.test/' });
   w = dom.window;
+  // fetch/Request выполняются в Node: сигнал и File должны быть из той же среды.
+  w.AbortController = AbortController;
+  w.AbortSignal = AbortSignal;
+  w.File = File;
   w.confirm = () => true;
   w.scrollTo = () => {};
   w.matchMedia = () => ({ matches: false, addEventListener() {}, addListener() {} });
+  w.Telegram = { WebApp: {
+    ready() {}, expand() {}, colorScheme: 'light',
+    BackButton: { show() {}, hide() {}, onClick() {} },
+    MainButton: { setParams() {}, hide() {}, onClick(fn: () => void) { mainButtonClick = fn; } },
+    showConfirm(_message: string, callback: (ok: boolean) => void) { callback(true); },
+  } };
   // «Сейчас» внутри браузера — то же, что на сервере
   w.eval(`(() => { const R = Date, fixed = new R('${NOW}').getTime();
     class F extends R { constructor(...a) { if (a.length === 0) super(fixed); else super(...a); } static now() { return fixed; } }
@@ -51,14 +67,42 @@ beforeAll(async () => {
       undefined as any,
     );
   w.addEventListener('error', (e: any) => errors.push(e.message));
-  w.eval(read('app.js'));
+  expect(appFiles()).toEqual(['app.js']);
+  modules = await loadFrontend(dom);
+  expect(errors).toEqual([]);
   await new Promise((r) => setTimeout(r, 150)); // первая загрузка недели и дня
 });
 
 afterAll(() => {
+  dom?.window.close();
   closeDb();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe('нижняя навигация', () => {
+  it('в шапке только календарь и админ-доступ, обе кнопки клиентов оформлены одинаково', () => {
+    expect($$('#header-actions button').map(button => button.id)).toEqual(['btn-open-admin', 'btn-open-calendar']);
+    expect($$('#bottom-nav .nav-tab-label').map(label => label.textContent)).toEqual(['Расписание', 'Клиенты', 'Доходы', 'Настройки']);
+    expect($('#btn-back-from-clients').className).toBe($('#btn-add-client').className);
+    expect($('#screen-clients #btn-open-search')).toBeTruthy();
+  });
+
+  it('подсвечивает текущую вкладку, возвращает к расписанию и скрывается в форме', async () => {
+    click('#btn-open-clients');
+    await until(() => $('#screen-clients').classList.contains('active'));
+    expect($('#bottom-nav').hidden).toBe(false);
+    expect($('#bottom-nav [aria-current="page"]').dataset.screen).toBe('clients');
+    click('#btn-back-from-clients');
+    expect($('#bottom-nav [aria-current="page"]').dataset.screen).toBe('main');
+    click('#btn-add-appt');
+    expect($('#bottom-nav').hidden).toBe(true);
+    click('#btn-cancel-appt');
+    expect($('#bottom-nav').hidden).toBe(false);
+    click('#btn-open-clients');
+    click('#btn-tab-main');
+    expect($('#screen-main').classList.contains('active')).toBe(true);
+  });
 });
 
 describe('экран «Доходы»', () => {
@@ -308,6 +352,96 @@ describe('восстановление из копии', () => {
     Object.defineProperty(input, 'files', { value: [junk], configurable: true });
     input.dispatchEvent(new w.Event('change', { bubbles: true }));
     await vi.waitFor(() => expect(txt('#toast')).toContain('не похож'), { timeout: 4000 });
+  });
+});
+
+describe('переходы между модулями', () => {
+  it('календарь выбирает день, поиск возвращает в расписание найденной записи', async () => {
+    click('#btn-open-calendar');
+    await until(() => $$('#calendar-grid .cal-day-cell:not(.other-month)').length === 31);
+    expect(txt('#cal-month-title')).toBe('Октябрь 2026');
+    $$('#calendar-grid .cal-day-cell').find((c) => c.querySelector('.cal-day-num')?.textContent === '14').click();
+    await until(() => $('#screen-main').classList.contains('active') && $$('.week-day-col.selected')[0]?.dataset.date === '2026-10-14');
+
+    click('#btn-open-clients');
+    click('#btn-open-search');
+    setVal('#search-input', 'Тестовая');
+    $('#search-input').dispatchEvent(new w.Event('input', { bubbles: true }));
+    await until(() => txt('#search-results-list').includes('Тестовая'));
+    click('#search-results-list .appointment-card');
+    await until(() => $('#screen-main').classList.contains('active') && $$('.appointment-card').some((c) => c.textContent.includes('Тестовая')));
+  });
+
+  it('заметка сохраняется кнопкой Telegram и удаляется через экран заметки', async () => {
+    click('#btn-day-note-action');
+    setVal('#note-text-input', 'Проверка заметки после разделения');
+    mainButtonClick();
+    await until(() => txt('#day-note-content') === 'Проверка заметки после разделения');
+    expect((await calls(OWNER, '/api/notes/2026-10-14')).text).toBe('Проверка заметки после разделения');
+    click('#btn-edit-note-card');
+    click('#btn-delete-note');
+    await until(() => $('#screen-main').classList.contains('active') && $('#day-note-card').style.display === 'none');
+    expect((await calls(OWNER, '/api/notes/2026-10-14')).text).toBeFalsy();
+  });
+
+  it('клиент создаётся, редактируется, подставляется в запись и удаляется', async () => {
+    click('#btn-open-clients');
+    click('#btn-add-client');
+    setVal('#edit-client-name', 'Клиент структурного теста');
+    setVal('#edit-client-phone', '+37369123456');
+    click('#btn-save-client');
+    await until(() => txt('#clients-list').includes('Клиент структурного теста'));
+    const card = () => $$('#clients-list .client-card').find((c) => c.textContent.includes('Клиент структурного теста'));
+    card().click();
+    await until(() => $('#modal-client-view').style.display === 'flex');
+    expect($('#client-view-phone-link').getAttribute('href')).toBe('tel:+37369123456');
+    click('#btn-client-edit');
+    setVal('#edit-client-notes', 'Предпочитает утренние записи');
+    click('#btn-save-client');
+    await until(() => txt('#clients-list').includes('Предпочитает утренние записи'));
+    // Сохранение обновляет и список, и подсказки формы.
+    await until(() => $$('#clients-datalist option').some((o) => o.value === 'Клиент структурного теста'));
+    card().click();
+    await until(() => $('#modal-client-view').style.display === 'flex');
+    click('#btn-client-book');
+    expect($('#screen-form').classList.contains('active')).toBe(true);
+    expect($('#form-appt-client').value).toBe('Клиент структурного теста');
+    click('#btn-cancel-appt');
+    click('#btn-open-clients');
+    await until(() => !!card());
+    card().click();
+    await until(() => $('#modal-client-view').style.display === 'flex');
+    click('#btn-client-delete');
+    await until(() => $('#modal-client-view').style.display === 'none' && !card());
+    expect((await calls(OWNER, '/api/clients')).some((c: any) => c.name === 'Клиент структурного теста')).toBe(false);
+  });
+
+  it('админ выбирает мастера, создаёт и меняет его запись, затем возвращается к своим данным', async () => {
+    env.ADMIN_ID = String(OWNER);
+    await modules('js/admin.js').loadMe();
+    expect($('#btn-open-admin').style.display).not.toBe('none');
+    click('#btn-open-admin');
+    await until(() => !!$(`#admin-masters-list .admin-master-card[data-id="${OTHER}"]`));
+    click(`#admin-masters-list .admin-master-card[data-id="${OTHER}"]`);
+    await until(() => $('#act-as-banner').style.display === 'flex' && !$('#appointments-list .loading-spinner'));
+    click('#btn-add-appt');
+    setVal('#form-appt-client', 'Запись другого мастера');
+    setVal('#form-appt-date', '2026-10-14');
+    setVal('#form-appt-start', '18:30');
+    click('#btn-submit-appt');
+    await until(() => $('#screen-main').classList.contains('active') && txt('#appointments-list').includes('Запись другого мастера'));
+    expect((await calls(OWNER, '/api/appointments?from=2026-10-14&to=2026-10-14')).some((a: any) => a.client_name === 'Запись другого мастера')).toBe(false);
+    expect((await calls(OTHER, '/api/appointments?from=2026-10-14&to=2026-10-14')).some((a: any) => a.client_name === 'Запись другого мастера')).toBe(true);
+    $$('#appointments-list .appointment-card').find((c) => c.textContent.includes('Запись другого мастера')).click();
+    setVal('#form-appt-start', '19:00');
+    click('#btn-submit-appt');
+    await until(() => $('#screen-main').classList.contains('active') && txt('#appointments-list').includes('19:00'));
+    click('#appointments-list .appointment-card');
+    click('#btn-delete-appt');
+    await until(() => $('#screen-main').classList.contains('active') && !txt('#appointments-list').includes('Запись другого мастера'));
+    expect(await calls(OTHER, '/api/appointments?from=2026-10-14&to=2026-10-14')).toEqual([]);
+    click('#btn-act-as-exit');
+    await until(() => $('#act-as-banner').style.display === 'none' && txt('#appointments-list').includes('Тестовая'));
   });
 });
 

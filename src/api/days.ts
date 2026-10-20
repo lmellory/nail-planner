@@ -2,7 +2,9 @@
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
 import { addMinutes, calculateFreeSlots, defaultServiceDuration, isDate } from '../lib/time';
-import { ensureUser, getDaySummary, getUser, listAppointments } from '../db';
+import { ensureUser, getUser } from '../db/users';
+import { getDaySummary } from '../db/notes';
+import { listAppointments } from '../db/appointments';
 import { isActiveStatus } from '../lib/status';
 
 export const days = new Hono<{ Bindings: Env; Variables: AppVars }>();
@@ -24,7 +26,7 @@ days.get('/slots', async (c) => {
   const u = (await getUser(c.env.DB, userId)) ?? (await ensureUser(c.env.DB, userId, c.env.TZ));
   const workStart = u.work_start_time || '09:00';
   const workEnd = u.work_end_time || '20:00';
-  const workDays = (u.work_days || '1,2,3,4,5,6').split(',').map((s) => Number(s.trim()));
+  const workDays = (u.work_days ?? '1,2,3,4,5,6').split(',').map((s) => Number(s.trim()));
 
   const dayOfWeekIso = new Date(date + 'T00:00:00Z').getUTCDay() || 7; // 1=Пн ... 7=Вс
   const isWorkDay = workDays.includes(dayOfWeekIso);

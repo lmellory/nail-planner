@@ -12,16 +12,11 @@
 // Удаление сообщений: бот сам стирает из чата сообщения «Новая запись» (см. scheduled_deletes).
 // Записи и заметки в базе НЕ удаляются.
 import type { Env } from './types';
-import {
-  ensureUser,
-  getClientByName,
-  getClientsWithBirthday,
-  getDayNote,
-  getDueMessageDeletes,
-  getUser,
-  listAppointments,
-  removeScheduledDelete,
-} from './db';
+import { ensureUser, getUser } from './db/users';
+import { getClientByName, getClientsWithBirthday } from './db/clients';
+import { getDayNote } from './db/notes';
+import { listAppointments } from './db/appointments';
+import { getDueMessageDeletes, removeScheduledDelete } from './db/notifications';
 import { getAllowedIds } from './lib/access';
 import { addDays, nowInTz } from './lib/time';
 import { formatDay } from './lib/format';
@@ -210,29 +205,18 @@ export async function runBirthdayNotifications(env: Env, appUrl: string) {
         .run();
       if (!claim.meta.changes) continue;
 
-      const [y, m, d] = now.date.split('-');
-      const todayDDMM = `${d}.${m}`;
-
-      const bdayClients = await getClientsWithBirthday(env.DB, userId, todayDDMM);
-      if (!bdayClients.length) {
-        // Именинников сегодня нет — бронь остаётся, чтобы больше не проверять сегодня
-        continue;
-      }
-
-      const text = formatBirthdayNotification(bdayClients);
-      const outcome = classifySend(await sendMessage(env, userId, text, openAppKeyboard(appUrl)));
-
-      if (outcome === 'sent') {
-        console.log(`birthday notify sent user=${userId} count=${bdayClients.length}`);
-      } else if (outcome === 'retry') {
-        // Откатываем бронь при сбое сети, чтобы повторить через минуту
-        try {
-          await env.DB
-            .prepare('UPDATE users SET last_birthday_notify_date=? WHERE user_id=? AND last_birthday_notify_date=?')
-            .bind(previousBdayDate, userId, now.date)
-            .run();
-        } catch (e) {
-          console.error('birthday rollback failed', userId, e);
+      let outcome: SendOutcome = 'retry';
+      try {
+        const [, m, d] = now.date.split('-');
+        const clients = await getClientsWithBirthday(env.DB, userId, `${d}.${m}`);
+        outcome = clients.length
+          ? classifySend(await sendMessage(env, userId, formatBirthdayNotification(clients), openAppKeyboard(appUrl)))
+          : 'sent';
+      } finally {
+        // Сбой чтения БД и форматирования тоже освобождает бронь для следующей попытки.
+        if (outcome === 'retry') {
+          await env.DB.prepare('UPDATE users SET last_birthday_notify_date=? WHERE user_id=? AND last_birthday_notify_date=?')
+            .bind(previousBdayDate, userId, now.date).run();
         }
       }
     } catch (e) {

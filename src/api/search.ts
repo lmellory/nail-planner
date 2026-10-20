@@ -1,7 +1,7 @@
 // Поиск клиента по части имени: GET /api/search?q=...
 import { Hono } from 'hono';
 import type { AppVars, Env } from '../types';
-import { searchAppointments } from '../db';
+import { searchAppointments } from '../db/appointments';
 
 export const search = new Hono<{ Bindings: Env; Variables: AppVars }>();
 

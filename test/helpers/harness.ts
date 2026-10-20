@@ -1,3 +1,4 @@
+import type { Database } from '../../src/types';
 // Тестовая обвязка: настоящая SQLite-база (файл) с настоящими миграциями + вызовы настоящего приложения.
 // Подменяется только Telegram (fetch), всё остальное — боевой код.
 import { createClient, type Client } from '@libsql/client';
@@ -37,7 +38,7 @@ export async function migrate(client: Client, upTo?: string) {
 }
 
 export async function createTestDb(opts: { upTo?: string } = {}) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'np-test-'));
+  const dir = mkdtempSync(path.join(process.env.NAIL_PLANNER_TEST_TMP || tmpdir(), 'np-test-'));
   const url = 'file:' + path.join(dir, 'db.sqlite');
   const client = createClient({ url });
   await migrate(client, opts.upTo);
@@ -48,12 +49,16 @@ export async function createTestDb(opts: { upTo?: string } = {}) {
     db: createD1FromClient(client),
     close() {
       client.close();
-      rmSync(dir, { recursive: true, force: true });
+      // npm test удаляет общую временную папку после выхода Vitest:
+      // нативный libSQL на Windows может удерживать файлы до завершения процесса.
+      if (!process.env.NAIL_PLANNER_TEST_TMP) {
+        rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
     },
   };
 }
 
-export function makeEnv(db: D1Database, extra: Record<string, unknown> = {}): any {
+export function makeEnv(db: Database, extra: Record<string, unknown> = {}): any {
   return {
     DB: db,
     BOT_TOKEN,

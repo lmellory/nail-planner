@@ -17,16 +17,9 @@
 // Наблюдатели (VIEWER_IDS) могут только /records (и /admin со своим списком): смотреть и выгружать записи.
 // Данные командами не удаляются; записи админ правит в Mini App (админ-панель).
 import type { Appointment, Env } from '../types';
-import {
-  getAllAppointments,
-  getEveryAppointment,
-  getGlobalStats,
-  getMigrationsInfo,
-  getUser,
-  getUserIncomeTotal,
-  listUsersAdmin,
-  listUsersOverview,
-} from '../db';
+import { getAllAppointments } from '../db/appointments';
+import { getEveryAppointment, getGlobalStats, getMigrationsInfo, getUserIncomeTotal, listUsersAdmin, listUsersOverview } from '../db/admin';
+import { getUser } from '../db/users';
 import { getAccessSnapshot, getAccessState, getAllowedIds, grantAccess, isAdmin, parseIdList, setBanned } from '../lib/access';
 import { buildJsonBackup } from '../lib/backup';
 import { buildCsv } from '../api/export';

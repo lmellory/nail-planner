@@ -395,11 +395,12 @@ describe('/adduser, /ban, /unban', () => {
     for (const c of ['/adduser', '/ban', '/unban', 'Записи мастеров правятся в приложении']) expect(messages()[0].text).toContain(c);
   });
 
-  it('сбой чтения таблицы access (нет миграции): работаем по ALLOWED_IDS, никого не отрезает', async () => {
+  it('сбой чтения таблицы access: секрет не позволяет обойти неизвестные блокировки', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     await env.DB.prepare('DROP TABLE access').run();
-    expect((await apiAs(OTHER, null, 'GET', '/api/settings')).status).toBe(200); // OTHER не админ: доступ идёт по ALLOWED_IDS
+    expect((await apiAs(OTHER, null, 'GET', '/api/settings')).status).toBe(403);
+    expect((await apiAs(OWNER, null, 'GET', '/api/settings')).status).toBe(200); // администратор проверяется отдельно
     expect((await apiAs(STRANGER, null, 'GET', '/api/settings')).status).toBe(403);
-    expect(await getAllowedIds(env)).toEqual([OWNER, OTHER]);
+    expect(await getAllowedIds(env)).toEqual([]);
   });
 });

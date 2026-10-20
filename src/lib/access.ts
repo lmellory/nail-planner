@@ -1,7 +1,7 @@
+import type { Database } from '../types';
 // Доступ пользователей: секрет ALLOWED_IDS + команды администратора /adduser, /ban, /unban (таблица access).
 //   итоговый доступ = (ALLOWED_IDS ∪ добавленные) минус заблокированные.
-// Если таблицы access ещё нет (миграция 0013 не применена) или запрос упал, работаем только по ALLOWED_IDS:
-// так сбой в этой части не может закрыть доступ всем.
+// При сбое чтения access обычный доступ закрыт: блокировки нельзя обходить через ALLOWED_IDS.
 import type { Env } from '../types';
 
 /** Разбор списка Telegram ID через запятую; нечисла и неположительные значения отбрасываются. */
@@ -37,24 +37,24 @@ export function accessState(inSecret: boolean, row: Pick<AccessRow, 'added' | 'b
 const toRow = (x: AccessRow): AccessRow => ({ user_id: Number(x.user_id), added: Number(x.added), banned: Number(x.banned) });
 
 /** Строка access пользователя. Бросает исключение, если запрос не удался (для команд администратора). */
-export async function getAccessRow(db: D1Database, userId: number): Promise<AccessRow | null> {
+export async function getAccessRow(db: Database, userId: number): Promise<AccessRow | null> {
   const r = await db.prepare('SELECT user_id, added, banned FROM access WHERE user_id = ?').bind(userId).first<AccessRow>();
   return r ? toRow(r) : null;
 }
 
 /** Все строки access. Бросает исключение, если запрос не удался. */
-export async function listAccess(db: D1Database): Promise<AccessRow[]> {
+export async function listAccess(db: Database): Promise<AccessRow[]> {
   const r = await db.prepare('SELECT user_id, added, banned FROM access').all<AccessRow>();
   return r.results.map(toRow);
 }
 
-/** Как listAccess, но при сбое возвращает пустой список (откат на ALLOWED_IDS). */
-async function listAccessSafe(db: D1Database): Promise<AccessRow[]> {
+/** Как listAccess, но при сбое возвращает null (доступ закрыт). */
+async function listAccessSafe(db: Database): Promise<AccessRow[] | null> {
   try {
     return await listAccess(db);
   } catch (e) {
-    console.error('access: таблица недоступна, используется только ALLOWED_IDS', e);
-    return [];
+    console.error('access: таблица недоступна, доступ закрыт', e);
+    return null;
   }
 }
 
@@ -65,6 +65,7 @@ export interface AccessSnapshot {
 
 export async function getAccessSnapshot(env: AccessEnv): Promise<AccessSnapshot> {
   const rows = await listAccessSafe(env.DB);
+  if (!rows) return { allowed: [], banned: [] };
   const banned = rows.filter((r) => r.banned).map((r) => r.user_id);
   const blocked = new Set(banned);
   const ids = new Set([...parseIdList(env.ALLOWED_IDS), ...rows.filter((r) => r.added).map((r) => r.user_id)]);
@@ -76,13 +77,14 @@ export async function getAllowedIds(env: AccessEnv): Promise<number[]> {
   return (await getAccessSnapshot(env)).allowed;
 }
 
-/** Состояние доступа одного пользователя (при сбое чтения таблицы — только по ALLOWED_IDS). */
+/** Состояние доступа одного пользователя (при сбое чтения таблицы — доступ закрыт). */
 export async function getAccessState(env: AccessEnv, userId: number): Promise<AccessState> {
   let row: AccessRow | null = null;
   try {
     row = await getAccessRow(env.DB, userId);
   } catch (e) {
-    console.error('access: таблица недоступна, используется только ALLOWED_IDS', e);
+    console.error('access: таблица недоступна, доступ закрыт', e);
+    return 'none';
   }
   return accessState(parseIdList(env.ALLOWED_IDS).includes(userId), row);
 }
@@ -93,7 +95,7 @@ export async function isAllowedUser(env: AccessEnv, userId: number): Promise<boo
 }
 
 /** /adduser: выдать доступ. Блокировку не снимает (её снимает /unban). */
-export async function grantAccess(db: D1Database, userId: number): Promise<void> {
+export async function grantAccess(db: Database, userId: number): Promise<void> {
   await db
     .prepare(
       `INSERT INTO access (user_id, added) VALUES (?, 1)
@@ -104,7 +106,7 @@ export async function grantAccess(db: D1Database, userId: number): Promise<void>
 }
 
 /** /ban и /unban. Строка без выданного доступа и без блокировки удаляется. */
-export async function setBanned(db: D1Database, userId: number, banned: boolean): Promise<void> {
+export async function setBanned(db: Database, userId: number, banned: boolean): Promise<void> {
   if (banned) {
     await db
       .prepare(

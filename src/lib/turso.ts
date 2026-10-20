@@ -1,12 +1,13 @@
+import type { Database } from '../types';
 // D1-совместимый адаптер для базы данных Turso (libSQL)
 import { createClient, type Client } from '@libsql/client/web';
 
-export function createTursoD1(url: string, authToken: string): D1Database {
+export function createTursoD1(url: string, authToken: string): Database {
   return createD1FromClient(createClient({ url, authToken }));
 }
 
 /** Оборачивает любой клиент libSQL в D1-совместимый интерфейс (в тестах — клиент на локальном файле). */
-export function createD1FromClient(client: Pick<Client, 'execute' | 'batch' | 'executeMultiple'>): D1Database {
+export function createD1FromClient(client: Pick<Client, 'execute' | 'batch' | 'executeMultiple'>): Database {
 
   class TursoPreparedStatement implements D1PreparedStatement {
     constructor(
@@ -64,7 +65,7 @@ export function createD1FromClient(client: Pick<Client, 'execute' | 'batch' | 'e
     raw<T = unknown[]>(options?: { columnNames?: false }): Promise<T[]>;
     async raw<T = unknown[]>(options?: { columnNames?: boolean }): Promise<any> {
       const res = await client.execute({ sql: this.sql, args: this.params });
-      const rows = res.rows as unknown as T[];
+      const rows = res.rows.map(row => res.columns.map(column => row[column])) as unknown as T[];
       if (options?.columnNames) {
         return [res.columns, ...rows];
       }
@@ -76,12 +77,9 @@ export function createD1FromClient(client: Pick<Client, 'execute' | 'batch' | 'e
     prepare(query: string): D1PreparedStatement {
       return new TursoPreparedStatement(query);
     },
-    async dump(): Promise<ArrayBuffer> {
-      throw new Error('Not implemented');
-    },
     async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
       const inStmts = statements.map((stmt) => {
-        const s = stmt as any;
+        const s = stmt as TursoPreparedStatement;
         return { sql: s.sql, args: s.params || [] };
       });
       const batchRes = await client.batch(inStmts, 'write');
@@ -102,5 +100,5 @@ export function createD1FromClient(client: Pick<Client, 'execute' | 'batch' | 'e
       await client.executeMultiple(query);
       return { count: 1, duration: 0 };
     },
-  } as unknown as D1Database;
+  };
 }

@@ -1,14 +1,15 @@
+import type { Database } from '../types';
 // Восстановление данных из JSON-резервной копии (см. lib/backup.ts).
 // Файл проверяется «строго по форме, лениво по мелочам»: чужой или повреждённый файл отклоняется целиком,
 // а отдельные битые строки пропускаются и считаются в отчёте. Данные мастера заменяются одной транзакцией.
-import { cleanBirthday } from '../api/clients';
+import { cleanBirthday } from './clients';
 import { BACKUP_FORMAT, BACKUP_VERSION } from './backup';
 import { parseAmount } from './money';
 import { SERVICES } from './services';
 import { isStatus } from './status';
 import { normalizeName } from './text';
 import { isDate, isTime } from './time';
-import { ensureUser, updateUserSettings } from '../db';
+import { settingsStatement, isWorkDays } from './settings';
 
 const MAX_ROWS = 20000;
 
@@ -81,7 +82,7 @@ function sanitizeSettings(s: any): RestoreSettings {
     out.work_start_time = s.work_start_time;
     out.work_end_time = s.work_end_time;
   }
-  if (typeof s.work_days === 'string' && /^[1-7](,[1-7])*$/.test(s.work_days)) out.work_days = s.work_days;
+  if (isWorkDays(s.work_days)) out.work_days = s.work_days;
   if (typeof s.tz === 'string') {
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: s.tz });
@@ -162,9 +163,10 @@ export function sanitizeBackup(raw: any): { ok: true; data: RestoreData; report:
 }
 
 /** Заменяет ВСЕ данные мастера содержимым копии — одной транзакцией (при ошибке ничего не меняется). */
-export async function restoreBackup(db: D1Database, userId: number, tzFallback: string, data: RestoreData): Promise<void> {
-  await ensureUser(db, userId, tzFallback);
+export async function restoreBackup(db: Database, userId: number, tzFallback: string, data: RestoreData): Promise<void> {
+
   const stmts: D1PreparedStatement[] = [
+    db.prepare('INSERT OR IGNORE INTO users (user_id, tz, notify_time) VALUES (?, ?, ?)').bind(userId, tzFallback, '22:00'),
     ...['appointments', 'clients', 'expenses', 'day_notes', 'service_prices'].map((t) =>
       db.prepare(`DELETE FROM ${t} WHERE user_id = ?`).bind(userId),
     ),
@@ -192,6 +194,7 @@ export async function restoreBackup(db: D1Database, userId: number, tzFallback: 
       db.prepare('INSERT INTO service_prices (user_id, service, price) VALUES (?,?,?)').bind(userId, service, price),
     ),
   ];
+  const settings = settingsStatement(db, userId, data.settings);
+  if (settings) stmts.push(settings);
   await db.batch(stmts);
-  if (Object.keys(data.settings).length) await updateUserSettings(db, userId, data.settings);
 }

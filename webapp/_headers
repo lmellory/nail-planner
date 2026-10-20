@@ -1,0 +1,16 @@
+# HTML должен получать актуальный список скриптов после выкладки.
+/
+  Cache-Control: no-store
+
+/index.html
+  Cache-Control: no-store
+
+# Перепроверяем статику и при обращении без ?v=.
+/style.css
+  Cache-Control: public, max-age=0, must-revalidate
+
+/app.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/js/*
+  Cache-Control: public, max-age=0, must-revalidate

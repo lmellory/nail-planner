@@ -4,7 +4,9 @@
 import { Hono } from 'hono';
 import type { Env } from '../types';
 import { isAllowedUser } from '../lib/access';
-import { ensureUser, getDayNote, listAppointments } from '../db';
+import { ensureUser } from '../db/users';
+import { getDayNote } from '../db/notes';
+import { listAppointments } from '../db/appointments';
 import { addDays, nowInTz } from '../lib/time';
 import { formatDay } from '../lib/format';
 import { openAppKeyboard, sendMessage } from './telegram';

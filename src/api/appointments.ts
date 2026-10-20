@@ -1,22 +1,14 @@
 // CRUD записей + проверка пересечений (предупреждение, без запрета).
 import { Hono } from 'hono';
 import type { AppVars, Env, Service } from '../types';
-import {
-  NEW_APPT_MSG_TTL_SEC,
-  deleteAppointment,
-  ensureClientExists,
-  ensureUser,
-  findConflicts,
-  getAppointment,
-  insertAppointment,
-  listAppointments,
-  scheduleMessageDelete,
-  updateAppointment,
-} from '../db';
+import { NEW_APPT_MSG_TTL_SEC, scheduleMessageDelete } from '../db/notifications';
+import { deleteAppointment, findConflicts, getAppointment, insertAppointment, listAppointments, updateAppointment } from '../db/appointments';
+import { ensureUser } from '../db/users';
 import { addMinutes, defaultServiceDuration, isDate, isTime } from '../lib/time';
 import { escapeHtml, sendMessage } from '../bot/telegram';
 import { parseAmount } from '../lib/money';
-import { SERVICES } from '../lib/services';
+import { isService } from '../lib/services';
+import { asRecord } from '../lib/validation';
 import { isStatus } from '../lib/status';
 import { serviceLabel, timeLabel } from '../lib/format';
 
@@ -25,12 +17,13 @@ export const appointments = new Hono<{ Bindings: Env; Variables: AppVars }>();
 const COATINGS = ['gel', 'none'];
 
 /** Проверка и нормализация тела запроса. Возвращает [данные, ошибка]. */
-export function validate(b: any) {
+export function validate(input: unknown) {
+  const b = asRecord(input);
   if (!isDate(b?.date)) return [null, 'Некорректная дата'] as const;
   if (!isTime(b?.start_time)) return [null, 'Некорректное время'] as const;
-  const name = String(b?.client_name ?? '').trim();
+  const name = typeof b.client_name === 'string' ? b.client_name.trim() : '';
   if (!name) return [null, 'Укажи имя клиента'] as const;
-  if (!SERVICES.includes(b?.service)) return [null, 'Некорректная услуга'] as const;
+  if (!isService(b?.service)) return [null, 'Некорректная услуга'] as const;
 
   let endTime = isTime(b?.end_time) ? (b.end_time as string) : null;
   if (!endTime) {
@@ -42,7 +35,7 @@ export function validate(b: any) {
   const needP = b.service === 'pedicure' || b.service === 'both';
   const mc = needM ? b.manicure_coating : null;
   const pc = needP ? b.pedicure_coating : null;
-  if ((needM && !COATINGS.includes(mc)) || (needP && !COATINGS.includes(pc)))
+  if ((needM && !COATINGS.includes(String(mc))) || (needP && !COATINGS.includes(String(pc))))
     return [null, 'Укажи покрытие: с покрытием или без'] as const;
 
   const price = parseAmount(b?.price);
@@ -75,9 +68,9 @@ appointments.get('/', async (c) => {
 
 // POST /api/appointments/check — проверка пересечений до сохранения (для предупреждения в форме).
 appointments.post('/check', async (c) => {
-  const b: any = await c.req.json().catch(() => null);
+  const b = asRecord(await c.req.json().catch(() => null));
   if (!isDate(b?.date) || !isTime(b?.start_time)) return c.json({ conflicts: [] });
-  const service = SERVICES.includes(b?.service) ? b.service : 'manicure';
+  const service = isService(b?.service) ? b.service : 'manicure';
   const endTime = isTime(b?.end_time)
     ? (b.end_time as string)
     : addMinutes(b.start_time, defaultServiceDuration(service));
@@ -93,16 +86,16 @@ appointments.post('/', async (c) => {
   const [d, err] = validate(await c.req.json().catch(() => null));
   if (!d) return c.json({ error: err }, 400);
 
-  const id = await insertAppointment(c.env.DB, userId, d);
-  await ensureClientExists(c.env.DB, userId, d.client_name, d.who).catch(() => {});
   const conflicts = await findConflicts(
     c.env.DB,
     userId,
     d.date,
     d.start_time,
     d.end_time ?? addMinutes(d.start_time, 120),
-    id,
+    0,
   );
+
+  const id = await insertAppointment(c.env.DB, userId, d, c.env.TZ);
 
   // Уведомление мастера в Telegram о новой записи (только если включено в настройках).
   // Отправляем в фоне: не задерживает ответ, ошибки не ломают сохранение.
@@ -139,8 +132,6 @@ appointments.put('/:id', async (c) => {
   if (!(await getAppointment(c.env.DB, userId, id))) return c.json({ error: 'not found' }, 404);
   const [d, err] = validate(await c.req.json().catch(() => null));
   if (!d) return c.json({ error: err }, 400);
-  await updateAppointment(c.env.DB, userId, id, d);
-  await ensureClientExists(c.env.DB, userId, d.client_name, d.who).catch(() => {});
   const conflicts = await findConflicts(
     c.env.DB,
     userId,
@@ -149,6 +140,7 @@ appointments.put('/:id', async (c) => {
     d.end_time ?? addMinutes(d.start_time, 120),
     id,
   );
+  if (!(await updateAppointment(c.env.DB, userId, id, d))) return c.json({ error: 'not found' }, 404);
   return c.json({ ok: true, conflicts });
 });
 

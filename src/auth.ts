@@ -2,7 +2,7 @@
 // Документация: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
 import type { Context, Next } from 'hono';
 import type { AppVars, Env } from './types';
-import { getUser } from './db';
+import { getUser } from './db/users';
 import { getAccessState, isAdmin, isAllowedUser } from './lib/access';
 
 const enc = new TextEncoder();
