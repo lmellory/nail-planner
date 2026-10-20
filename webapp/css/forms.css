@@ -1,0 +1,219 @@
+/* --------------------------------------------------------------------------
+   Форма записи (Экран 2)
+   -------------------------------------------------------------------------- */
+.form-title-bar {
+  margin-bottom: 16px;
+}
+
+.form-group {
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 6px;
+}
+
+.form-input, .form-textarea, select.form-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-pink-border);
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 16px;
+  font-family: inherit;
+  transition: border-color var(--transition-fast);
+}
+
+/* Safari не должен навязывать date/time полям ширину нативного элемента управления. */
+.form-input[type="date"], .form-input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 48px;
+  text-align: center;
+}
+.form-input::-webkit-date-and-time-value { min-width: 0; text-align: center; }
+.form-input::-webkit-datetime-edit { min-width: 0; padding: 0; }
+
+.time-range-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 12px; }
+@media (min-width: 480px) {
+  .time-range-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.form-input:focus, .form-textarea:focus, select.form-input:focus {
+  outline: none;
+  border-color: var(--powder-500);
+  box-shadow: 0 0 0 3px var(--accent-pink-soft);
+}
+
+.form-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--hint-color);
+  margin-top: 4px;
+}
+
+/* Одиночное аккуратное поле времени приёма */
+.time-single-input {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 13px 16px;
+}
+
+/* Сегментированный переключатель услуг */
+.segmented-control {
+  display: flex;
+  background: var(--powder-100);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-pink-border);
+  gap: 4px;
+}
+
+.segment-btn {
+  flex: 1;
+  padding: 10px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: calc(var(--radius-md) - 3px);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.segment-btn.active {
+  background: var(--secondary-bg);
+  color: var(--powder-600);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Четыре услуги: сетка 2×2, чтобы длинная подпись «Маникюр + пальцы» помещалась на узком экране */
+#service-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Чипы выбора покрытия */
+.coating-chips {
+  display: flex;
+  gap: 8px;
+}
+
+.coating-chip {
+  flex: 1;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--accent-pink-border);
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.coating-chip.active {
+  border-color: var(--powder-500);
+  background: var(--powder-100);
+  color: var(--powder-dark);
+}
+
+/* Предупреждение о конфликте времени */
+.conflict-alert {
+  display: flex;
+  gap: 12px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  color: var(--warning-text);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.alert-icon {
+  font-size: 20px;
+}
+
+.alert-body strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.alert-body small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+/* Кнопки действий */
+.form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.btn-primary, .btn-secondary, .btn-danger {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--powder-400) 0%, var(--powder-500) 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(216, 110, 136, 0.35);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  color: var(--text-color);
+}
+
+.btn-secondary:active {
+  background: var(--powder-100);
+}
+
+.btn-danger {
+  background: var(--danger-soft);
+  color: var(--danger-color);
+  border: 1px solid rgba(224, 82, 99, 0.25);
+}
+
+.btn-danger:active {
+  background: var(--danger-color);
+  color: #fff;
+}

@@ -26,6 +26,13 @@ export function versionAssets(webappDir = fileURLToPath(new URL('../webapp/', im
         visit(dependency);
       }
     }
+    if (asset.endsWith('.css')) {
+      for (const match of source.matchAll(/@import\s+(?:url\(\s*)?['"]([^'"]+)['"]/g)) {
+        if (/^(?:[a-z]+:|\/\/)/i.test(match[1])) continue;
+        const dependency = path.posix.resolve(path.posix.dirname(asset), match[1]);
+        visit(dependency);
+      }
+    }
   }
   assets.forEach(visit);
   for (const asset of [...visited].sort()) {

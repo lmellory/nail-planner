@@ -9,7 +9,8 @@
     "deploy": "npm run version-assets && wrangler deploy",
     "migrate": "node scripts/migrate.js",
     "typecheck": "tsc --noEmit && node scripts/check-frontend.js",
-    "test": "node scripts/test.js"
+    "test": "node scripts/test.js",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261006.1",
+    "@playwright/test": "1.62.1",
     "jsdom": "^30.1.2",
     "typescript": "^5.6.0",
     "vitest": "^3.2.0",

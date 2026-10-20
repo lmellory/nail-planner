@@ -1,0 +1,167 @@
+/* --------------------------------------------------------------------------
+   Рабочие дни в настройках
+   -------------------------------------------------------------------------- */
+.work-days-picker {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.day-toggle-pill {
+  flex: 1;
+  min-width: 38px;
+  background: var(--powder-100);
+  border: 1px solid var(--accent-pink-border);
+  color: var(--hint-color);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 0;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.day-toggle-pill.active {
+  background: var(--powder-500);
+  color: #ffffff;
+  border-color: var(--powder-600);
+}
+
+/* --------------------------------------------------------------------------
+   Окно устаревшей сессии (24h)
+   -------------------------------------------------------------------------- */
+.session-expired-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.session-expired-card {
+  background: var(--secondary-bg);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.session-expired-icon {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+.session-expired-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.session-expired-card p {
+  font-size: 14px;
+  color: var(--hint-color);
+  margin-bottom: 18px;
+  line-height: 1.4;
+}
+
+/* --------------------------------------------------------------------------
+   День рождения клиента
+   -------------------------------------------------------------------------- */
+.birthday-selects-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.bday-select {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-pink-border);
+  background: var(--secondary-bg);
+  color: var(--text-color);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn-clear-bday {
+  width: 36px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent-pink-border);
+  background: var(--powder-100);
+  color: var(--hint-color);
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-clear-bday:hover {
+  background: var(--powder-200);
+  color: var(--powder-700);
+}
+
+.field-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--hint-color);
+  margin-top: 4px;
+}
+
+.client-view-bday-badge {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--powder-700);
+  background: var(--powder-100);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--powder-300);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.client-view-bday-badge.today {
+  background: #fdf2f8;
+  color: #db2777;
+  border-color: #f472b6;
+  font-weight: 700;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+.client-card-bday {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--powder-700);
+  background: var(--powder-100);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--powder-200);
+  margin-left: 6px;
+}
+
+.client-card-bday.today {
+  background: #fdf2f8;
+  color: #db2777;
+  border-color: #f472b6;
+  font-weight: 700;
+}

@@ -284,7 +284,10 @@ function openClientEdit(client = null) {
   }
 
   if (modal) modal.style.display = 'flex';
-  setTimeout(() => nameInput?.focus(), 100);
+  setTimeout(() => {
+    if (modal?.style.display !== 'flex' || modal.contains(document.activeElement)) return;
+    nameInput?.focus();
+  }, 100);
 }
 
 function closeClientEdit() {

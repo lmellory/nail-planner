@@ -26,6 +26,17 @@ afterEach(() => {
 });
 
 describe('версии статики', () => {
+  it('учитывает CSS imports: изменение вложенного стиля обновляет версию, отсутствующий файл останавливает выкладку', () => {
+    const dir = fixture();
+    mkdirSync(path.join(dir, 'css'));
+    writeFileSync(path.join(dir, 'style.css'), "@import url('./css/forms.css');");
+    writeFileSync(path.join(dir, 'css/forms.css'), '.form-input { width: 100%; }');
+    const first = versionAssets(dir);
+    writeFileSync(path.join(dir, 'css/forms.css'), '.form-input { width: 90%; }');
+    expect(versionAssets(dir).version).not.toBe(first.version);
+    rmSync(path.join(dir, 'css/forms.css'));
+    expect(() => versionAssets(dir)).toThrow();
+  });
   it('учитывает вложенные ES imports, включая циклы, и отвергает отсутствующую зависимость', () => {
     const dir = fixture();
     writeFileSync(path.join(dir, 'app.js'), "import './js/core.js';");

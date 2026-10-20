@@ -1,0 +1,188 @@
+/* ==========================================================================
+   Ежедневник мастера маникюра/педикюра
+   Стили Mini App: Пудрово-розовая палитра + полная поддержка тем Telegram
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+  /* Базовые цвета Telegram с красивыми дефолтными значениями */
+  --bg-color: var(--tg-theme-bg-color, #fdf8f9);
+  --secondary-bg: var(--tg-theme-secondary-bg-color, #ffffff);
+  --text-color: var(--tg-theme-text-color, #2d2426);
+  --hint-color: var(--tg-theme-hint-color, #9c8a8f);
+  --link-color: var(--tg-theme-link-color, #d46b85);
+  --button-color: var(--tg-theme-button-color, #e591a4);
+  --button-text: var(--tg-theme-button-text-color, #ffffff);
+
+  /* Фирменная пудрово-розовая палитра мастера */
+  --powder-50: #fff5f7;
+  --powder-100: #fde8ed;
+  --powder-200: #fad1db;
+  --powder-300: #f4b2c1;
+  --powder-400: #e890a5;
+  --powder-500: #d86e88;
+  --powder-600: #c1506c;
+  --powder-dark: #91354d;
+
+  --accent-pink: #e58b9f;
+  --accent-pink-hover: #d7768c;
+  --accent-pink-soft: rgba(229, 139, 159, 0.16);
+  --accent-pink-border: rgba(229, 139, 159, 0.35);
+
+  --danger-color: #e05263;
+  --danger-soft: rgba(224, 82, 99, 0.12);
+  --warning-bg: #fff8e6;
+  --warning-border: #f5d082;
+  --warning-text: #8c5b05;
+
+  --card-shadow: 0 4px 16px rgba(184, 115, 133, 0.08);
+  --card-shadow-hover: 0 6px 20px rgba(184, 115, 133, 0.14);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --transition-fast: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Тёмная тема: класс на <html> ставится до отрисовки (см. index.html) и при смене темы Telegram (app.js) */
+:root.dark-theme {
+  color-scheme: dark;
+  --bg-color: var(--tg-theme-bg-color, #1a1618);
+  --secondary-bg: var(--tg-theme-secondary-bg-color, #261f22);
+  --text-color: var(--tg-theme-text-color, #f5eff1);
+  --hint-color: var(--tg-theme-hint-color, #a8949a);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --powder-50: #261e21;
+  --powder-100: #33272c;
+  --powder-dark: #f4b2c1;
+  --warning-bg: #332612;
+  --warning-border: #80601e;
+  --warning-text: #ffd580;
+}
+
+/* Базовые сбросы */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  background-color: var(--bg-color);
+}
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  /* Прокручивается документ. Фиксированная высота body обрезает отступ под меню в WebView. */
+  overscroll-behavior-y: none;
+  position: relative;
+}
+
+#app {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Отступ принадлежит содержимому, поэтому последнюю карточку можно прокрутить выше меню. */
+  padding-bottom: calc(var(--bottom-nav-inset) + 16px);
+}
+
+/* --------------------------------------------------------------------------
+   Шапка приложения
+   -------------------------------------------------------------------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  padding-top: calc(max(var(--tg-content-safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px), env(safe-area-inset-top, 0px)) + 12px);
+  background: var(--bg-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--accent-pink-border);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-color);
+  letter-spacing: -0.3px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.icon-btn:active {
+  background: var(--accent-pink-soft);
+  transform: scale(0.92);
+}
+
+/* --------------------------------------------------------------------------
+   Экраны (Screen switching)
+   -------------------------------------------------------------------------- */
+.screen {
+  display: none;
+  opacity: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  transform: translateY(6px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+.screen.active {
+  display: block;
+  opacity: 1;
+  transform: none;
+}
+
+.screen-content {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+}

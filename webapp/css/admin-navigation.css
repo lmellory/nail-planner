@@ -1,0 +1,116 @@
+/* ===== Админ-панель и режим «правка за мастера» ===== */
+.act-as-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--accent-pink-soft);
+  border-bottom: 1px solid var(--accent-pink-border);
+  font-size: 14px;
+}
+.act-as-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-as-exit {
+  flex: none;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-pink-border);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* В этом режиме доступны только записи: остальное скрыто (сервер всё равно не пустит) */
+.acting-as #btn-open-clients,
+.acting-as #btn-open-income,
+.acting-as #btn-open-settings,
+.acting-as #btn-day-note-action,
+.acting-as #btn-edit-note-card { display: none !important; }
+
+.admin-intro { margin: 4px 0 14px; font-size: 14px; opacity: 0.8; line-height: 1.4; }
+.admin-masters-list { display: flex; flex-direction: column; gap: 10px; }
+.admin-master-card { cursor: pointer; }
+.admin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-pink-border);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+.admin-badge.is-banned { background: var(--accent-pink-soft); }
+
+/* Нижняя навигация: геометрия Gym Planner в фирменной розовой палитре Nails. */
+:root {
+  --bottom-nav-height: 64px;
+  --bottom-nav-inset: max(var(--tg-content-safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+}
+body.has-bottom-nav #app { padding-bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 90px); }
+.has-bottom-nav .fab-btn { bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 20px); }
+.has-bottom-nav .toast { bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 16px); }
+.bottom-nav {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 640px;
+  height: calc(var(--bottom-nav-height) + var(--bottom-nav-inset));
+  padding: 0 6px var(--bottom-nav-inset);
+  display: flex;
+  align-items: center;
+  background: var(--secondary-bg);
+  border-top: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--card-shadow);
+  z-index: 90;
+}
+.bottom-nav[hidden] { display: none; }
+.nav-tab {
+  flex: 1;
+  min-width: 0;
+  height: var(--bottom-nav-height);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--hint-color);
+  font: inherit;
+  cursor: pointer;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+.nav-tab svg { width: 24px; height: 24px; flex-shrink: 0; }
+.nav-tab-label { font-size: 11px; font-weight: 500; line-height: 1.2; }
+.nav-tab.active { color: var(--powder-500); }
+.nav-tab.active .nav-tab-label { font-weight: 700; }
+.nav-tab:active { transform: scale(0.94); }
+.nav-tab:focus-visible, .client-records-search:focus-visible { outline: 2px solid var(--powder-500); outline-offset: -2px; }
+.clients-header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; }
+.clients-header .btn-primary-small { min-height: 38px; width: 84px; padding: 8px 14px; white-space: nowrap; }
+.clients-header #btn-back-from-clients { justify-self: start; }
+.clients-header #btn-add-client { justify-self: end; }
+.client-records-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--accent-pink-border);
+  border-radius: var(--radius-full);
+  background: var(--accent-pink-soft);
+  color: var(--powder-dark);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}

@@ -33,3 +33,6 @@ Thumbs.db
 Desktop.ini
 .vscode/
 .idea/
+# Результаты браузерных проверок
+playwright-report/
+test-results/

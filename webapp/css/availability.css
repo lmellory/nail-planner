@@ -1,0 +1,66 @@
+/* --------------------------------------------------------------------------
+   Свободные окна в расписании дня
+   -------------------------------------------------------------------------- */
+.free-slots-card {
+  background: var(--powder-50);
+  border: 1px dashed var(--powder-300);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.free-slots-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.free-slots-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--powder-600);
+}
+
+.free-slots-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--powder-200);
+  color: var(--powder-dark);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.free-slots-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.slot-chip {
+  background: var(--secondary-bg);
+  border: 1px solid var(--accent-pink-border);
+  color: var(--text-color);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.slot-chip:active {
+  background: var(--powder-400);
+  color: #ffffff;
+  transform: scale(0.96);
+}
+
+.client-match-badge {
+  background: var(--powder-50);
+  border: 1px solid var(--powder-300);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--powder-dark);
+  margin-top: 6px;
+}

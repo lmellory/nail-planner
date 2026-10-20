@@ -4,7 +4,7 @@ import { escapeHtml, showToast } from './ui.js';
 import { goScreen } from './navigation.js';
 import { fmt, mondayOf } from './dates.js';
 import { loadClientsDatalist, resetClientCache } from './clients.js';
-import { loadPrices } from './notes-settings.js';
+import { loadPrices } from './prices.js';
 import { loadSelectedDay, loadWeekSummary, renderAppointmentsList, renderWeekStrip } from './schedule.js';
 import { haptic } from './telegram.js';
 

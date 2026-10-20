@@ -1,35 +1,16 @@
-import { state, todayStr } from './state.js';
+import { todayStr } from './state.js';
 import { RU_MONTHS, RU_MONTHS_NOM, RU_WEEKDAYS_SHORT, addDays, fmt, parseDate } from './dates.js';
-import { confirmDialog, escapeHtml, showToast } from './ui.js';
+import { escapeHtml, showToast } from './ui.js';
 import { formatMoney } from './money.js';
 import { plural } from './schedule.js';
 import { haptic } from './telegram.js';
 import { api } from './api.js';
 import { goScreen } from './navigation.js';
-import { singleAction } from './requests.js';
+
+import { income, incomePeriodLabel } from './finance-state.js';
 
 // ===== ДОХОДЫ =====
 const RU_MONTHS_SHORT = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
-
-export const income = {
-  period: 'week',      // week | month | year
-  anchor: todayStr,    // любая дата внутри показываемого периода
-  data: null,          // ответ GET /api/stats
-  selectedKey: null,   // выбранный столбик диаграммы
-  metric: 'income',    // что рисует диаграмма: income | expense
-  requestId: 0,        // защита от «устаревших» ответов при быстром переключении
-};
-
-function incomePeriodLabel(d) {
-  const from = parseDate(d.from);
-  const to = parseDate(d.to);
-  if (d.period === 'year') return String(from.getFullYear());
-  if (d.period === 'month') return `${RU_MONTHS_NOM[from.getMonth()]} ${from.getFullYear()}`;
-  if (from.getMonth() === to.getMonth()) {
-    return `${from.getDate()}–${to.getDate()} ${RU_MONTHS[to.getMonth()]} ${to.getFullYear()}`;
-  }
-  return `${from.getDate()} ${RU_MONTHS[from.getMonth()]} – ${to.getDate()} ${RU_MONTHS[to.getMonth()]} ${to.getFullYear()}`;
-}
 
 function incomeBucketTitle(period, bucket) {
   const d = parseDate(bucket.from);
@@ -225,7 +206,7 @@ function renderIncome() {
   renderIncomeSummary();
 }
 
-async function loadIncome() {
+export async function loadIncome() {
   const reqId = ++income.requestId;
   try {
     const data = await api(`/stats?period=${income.period}&date=${income.anchor}`);
@@ -274,151 +255,6 @@ document.querySelectorAll('#income-period-selector .segment-btn').forEach((btn) 
 document.getElementById('btn-income-prev')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(-1); loadIncome(); });
 document.getElementById('btn-income-next')?.addEventListener('click', () => { haptic('light'); shiftIncomeAnchor(1); loadIncome(); });
 
-// ===== ТРАТЫ НА МАТЕРИАЛЫ =====
-let expenseNamesLoaded = false;
-
-async function loadExpenseNames() {
-  try {
-    const names = await api('/expenses/names');
-    const list = document.getElementById('expense-names-datalist');
-    if (list) list.innerHTML = names.map((n) => `<option value="${escapeHtml(n)}"></option>`).join('');
-    expenseNamesLoaded = true;
-  } catch {}
-}
-
-function openExpenseEdit(expense = null) {
-  const modal = document.getElementById('modal-expense-edit');
-  document.getElementById('modal-expense-title').textContent = expense ? 'Редактировать трату' : 'Новая трата';
-  document.getElementById('edit-expense-id').value = expense ? expense.id : '';
-  document.getElementById('edit-expense-date').value = expense ? expense.date : todayStr;
-  document.getElementById('edit-expense-name').value = expense ? expense.name : '';
-  document.getElementById('edit-expense-amount').value = expense ? expense.amount : '';
-  document.getElementById('btn-delete-expense').style.display = expense ? 'block' : 'none';
-  if (modal) modal.style.display = 'flex';
-  loadExpenseNames();
-  setTimeout(() => document.getElementById('edit-expense-name')?.focus(), 100);
-}
-
-function closeExpenseEdit() {
-  const modal = document.getElementById('modal-expense-edit');
-  if (modal) modal.style.display = 'none';
-}
-
-// После изменения трат обновляем тот экран, который открыт под окном
-async function refreshAfterExpenseChange() {
-  if (state.currentScreen === 'expenses') await loadExpensesList();
-  else if (state.currentScreen === 'income') await loadIncome();
-}
-
-function saveExpense() {
-  return singleAction('saveExpense', ["btn-save-expense"], performSaveExpense);
-}
-
-async function performSaveExpense() {
-  const id = document.getElementById('edit-expense-id')?.value;
-  const date = document.getElementById('edit-expense-date')?.value;
-  const name = document.getElementById('edit-expense-name')?.value?.trim();
-  const amountEl = document.getElementById('edit-expense-amount');
-
-  if (!date) return showToast('Укажите дату');
-  if (!name) return showToast('Укажите, на что потрачено');
-  if (amountEl?.validity?.badInput) return showToast('Сумма — целое число, например 450');
-  const amount = Number(amountEl?.value?.trim() ?? '');
-  if (!Number.isInteger(amount) || amount <= 0) return showToast('Сумма — целое число больше нуля');
-
-  try {
-    await api(id ? `/expenses/${id}` : '/expenses', {
-      method: id ? 'PUT' : 'POST',
-      body: JSON.stringify({ date, name, amount }),
-    });
-    haptic('success');
-    showToast(id ? 'Трата обновлена ✅' : 'Трата добавлена ✅');
-    closeExpenseEdit();
-    await refreshAfterExpenseChange();
-  } catch (err) {
-    console.error('Ошибка сохранения траты:', err);
-  }
-}
-
-function deleteExpenseModal() {
-  const id = document.getElementById('edit-expense-id')?.value;
-  if (!id) return;
-  confirmDialog('Удалить эту трату?', async (confirmed) => {
-    if (!confirmed) return;
-    try {
-      await api(`/expenses/${id}`, { method: 'DELETE' });
-      haptic('success');
-      showToast('Трата удалена');
-      closeExpenseEdit();
-      await refreshAfterExpenseChange();
-    } catch (err) {
-      console.error('Ошибка удаления траты:', err);
-    }
-  });
-}
-
-function renderExpensesList(items) {
-  const list = document.getElementById('expenses-list');
-  const totalEl = document.getElementById('expenses-total');
-  if (!list) return;
-  list.innerHTML = '';
-  totalEl.textContent = formatMoney(items.reduce((a, x) => a + x.amount, 0));
-  if (!items.length) {
-    list.innerHTML = '<div class="expenses-empty">За этот период трат нет.<br>Нажми «+ Новая», чтобы добавить.</div>';
-    return;
-  }
-  // Группируем по дате (список уже отсортирован: новые сверху)
-  const byDate = new Map();
-  for (const x of items) {
-    if (!byDate.has(x.date)) byDate.set(x.date, []);
-    byDate.get(x.date).push(x);
-  }
-  for (const [date, rows] of byDate) {
-    const d = parseDate(date);
-    const head = document.createElement('div');
-    head.className = 'expenses-day';
-    head.innerHTML = `<span>${RU_WEEKDAYS_SHORT[(d.getDay() + 6) % 7]}, ${d.getDate()} ${RU_MONTHS[d.getMonth()]}</span>` +
-      `<span>${formatMoney(rows.reduce((a, x) => a + x.amount, 0))}</span>`;
-    list.appendChild(head);
-    for (const x of rows) {
-      const row = document.createElement('div');
-      row.className = 'expense-row';
-      row.innerHTML = `<span class="expense-name">${escapeHtml(x.name)}</span><span class="expense-amount">${formatMoney(x.amount)}</span>`;
-      row.addEventListener('click', () => { haptic('light'); openExpenseEdit(x); });
-      list.appendChild(row);
-    }
-  }
-}
-
-async function loadExpensesList() {
-  // Показываем траты за тот же период, что выбран на экране «Доходы»
-  const d = income.data;
-  const from = d ? d.from : state.weekStart;
-  const to = d ? d.to : addDays(state.weekStart, 6);
-  document.getElementById('expenses-period-label').textContent = d ? incomePeriodLabel(d) : '';
-  try {
-    renderExpensesList(await api(`/expenses?from=${from}&to=${to}`));
-  } catch (err) {
-    console.error('Ошибка загрузки трат:', err);
-  }
-}
-
-document.getElementById('btn-add-expense')?.addEventListener('click', () => { haptic('light'); openExpenseEdit(null); });
-document.getElementById('btn-add-expense-list')?.addEventListener('click', () => { haptic('light'); openExpenseEdit(null); });
-document.getElementById('btn-open-expenses')?.addEventListener('click', () => {
-  haptic('light');
-  goScreen('expenses');
-  loadExpensesList();
-});
-document.getElementById('btn-back-from-expenses')?.addEventListener('click', () => {
-  haptic('light');
-  goScreen('income');
-  loadIncome(); // траты могли измениться
-});
-document.getElementById('btn-close-expense-edit')?.addEventListener('click', closeExpenseEdit);
-document.getElementById('btn-cancel-expense-edit')?.addEventListener('click', closeExpenseEdit);
-document.getElementById('btn-save-expense')?.addEventListener('click', saveExpense);
-document.getElementById('btn-delete-expense')?.addEventListener('click', deleteExpenseModal);
 document.querySelectorAll('#income-metric-selector .segment-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     haptic('light');
@@ -430,3 +266,22 @@ document.querySelectorAll('#income-metric-selector .segment-btn').forEach((btn) 
     renderIncome();
   });
 });
+
+async function exportFinance() {
+  haptic('light');
+  showToast('Формируем файл и отправляем в чат…');
+  try {
+    const res = await api('/export/finance', {
+      method: 'POST',
+      body: JSON.stringify({ period: income.period, date: income.anchor }),
+    });
+    if (res.ok) {
+      haptic('success');
+      showToast('📊 CSV за период отправлен в чат!');
+    }
+  } catch (err) {
+    console.error('Ошибка выгрузки доходов:', err);
+  }
+}
+
+document.getElementById('btn-export-finance')?.addEventListener('click', exportFinance);

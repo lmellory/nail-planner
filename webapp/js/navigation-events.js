@@ -1,7 +1,8 @@
 import { state, todayStr } from './state.js';
 import { updateGreeting } from './greeting.js';
 import { haptic, tg } from './telegram.js';
-import { openSettings, saveDayNote } from './notes-settings.js';
+import { openSettings } from './settings.js';
+import { saveDayNote } from './notes.js';
 import { openCalendar, openSearch } from './calendar-search.js';
 import { selectDate, shiftWeek } from './schedule.js';
 import { goScreen } from './navigation.js';

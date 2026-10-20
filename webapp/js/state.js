@@ -3,6 +3,7 @@ import { fmt, mondayOf } from './dates.js';
 // ===== Состояние приложения =====
 export const todayStr = fmt(new Date());
 
+/** @type {import('./contracts').AppState} */
 export const state = {
   currentScreen: 'main',
   selectedDate: todayStr,

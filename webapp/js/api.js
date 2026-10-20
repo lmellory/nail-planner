@@ -2,17 +2,24 @@ import { tg } from './telegram.js';
 import { state } from './state.js';
 import { showToast } from './ui.js';
 
-/** Запрос к API. Подпись Telegram передаётся в заголовке X-Init-Data */
+/**
+ * Запрос к API. Подпись Telegram передаётся в заголовке X-Init-Data.
+ * @template [T=unknown]
+ * @param {string} path
+ * @param {Omit<RequestInit, 'headers'> & {headers?: Record<string, string>}} [options]
+ * @returns {Promise<T>}
+ */
 export async function api(path, options = {}) {
   const write = options.method && options.method !== 'GET' && options.method !== 'HEAD' && path !== '/appointments/check';
   if (write) state.pendingWrites++;
   try {
-    return await request(path, options);
+    return /** @type {T} */ (await request(path, options));
   } finally {
     if (write) state.pendingWrites--;
   }
 }
 
+/** @param {string} path @param {Omit<RequestInit, 'headers'> & {headers?: Record<string, string>}} options @returns {Promise<unknown>} */
 async function request(path, options) {
   const initData = tg?.initData || '';
   const context = state.contextVersion;
@@ -23,14 +30,13 @@ async function request(path, options) {
       headers: {
         'Content-Type': 'application/json',
         'X-Init-Data': initData,
-        // Админ правит записи выбранного мастера: сервер выполнит запрос над его данными (и только для записей)
         ...(state.actAs ? { 'X-Act-As': String(state.actAs) } : {}),
         ...(options.headers || {}),
       },
     });
   } catch (err) {
     if (context !== state.contextVersion) throw new DOMException('Контекст изменился', 'AbortError');
-    if (err.name === 'AbortError') throw err;
+    if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') throw err;
     showToast('Ошибка сети');
     throw err;
   }
@@ -42,8 +48,9 @@ async function request(path, options) {
     throw new Error('Сессия устарела');
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = err.error || 'Ошибка ' + res.status;
+    const err = /** @type {unknown} */ (await res.json().catch(() => null));
+    const msg = err && typeof err === 'object' && 'error' in err && typeof err.error === 'string'
+      ? err.error : 'Ошибка ' + res.status;
     showToast(msg);
     throw new Error(msg);
   }

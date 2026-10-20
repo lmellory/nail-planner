@@ -1,0 +1,231 @@
+/* --------------------------------------------------------------------------
+   Экран Клиенты и Карточки клиентов
+   -------------------------------------------------------------------------- */
+.screen-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.screen-sub-header h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.btn-primary-small {
+  background: var(--powder-500);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-primary-small:active {
+  background: var(--powder-600);
+  transform: scale(0.96);
+}
+
+.clients-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.client-card {
+  background: var(--secondary-bg);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--accent-pink-border);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.client-card:active {
+  transform: scale(0.985);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.client-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.client-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.client-card-visits {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--powder-100);
+  color: var(--powder-dark);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+}
+
+.client-card-contacts {
+  font-size: 13px;
+  color: var(--hint-color);
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.client-card-note {
+  font-size: 12px;
+  color: var(--powder-600);
+  background: var(--powder-50);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+  line-height: 1.35;
+}
+
+/* --------------------------------------------------------------------------
+   Модальные окна карточки клиента и редактирования
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-sheet {
+  background: var(--secondary-bg);
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 20px 18px env(safe-area-inset-bottom, 20px);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--hint-color);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.client-meta-card {
+  background: var(--powder-50);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.client-contact-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.contact-link {
+  color: var(--link-color);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.client-notes-box {
+  margin-top: 4px;
+}
+
+.notes-caption {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hint-color);
+  text-transform: uppercase;
+}
+
+.client-notes-box p {
+  font-size: 13px;
+  color: var(--text-color);
+  margin-top: 3px;
+}
+
+.client-history-section h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--hint-color);
+  text-transform: uppercase;
+}
+
+.client-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.history-item {
+  background: var(--powder-50);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-actions-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 0.8fr;
+  gap: 8px;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.modal-footer .btn {
+  flex: 1;
+}
