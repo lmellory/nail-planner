@@ -6,7 +6,15 @@ async function expectFieldsInside(page, selector) {
     return rect.width && (rect.left < parent.left - 1 || rect.right > parent.right + 1);
   }).map(field => field.id));
   expect(outside).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const overflow = await page.evaluate(() => ({
+    width: innerWidth,
+    document: document.documentElement.scrollWidth,
+    elements: [...document.querySelectorAll('body *')].filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width && (rect.right > innerWidth + 1 || rect.left < -1);
+    }).map(el => ({ tag: el.tagName, id: el.id, className: el.className })).slice(0, 12),
+  }));
+  expect(overflow.document, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.width);
 }
 
 test('поля настроек, даты и времени помещаются в карточки', async ({ page, model }) => {

@@ -85,15 +85,23 @@
 
 .segment-btn {
   flex: 1;
+  min-width: 0;
   padding: 10px 4px;
   border: none;
   background: transparent;
   color: var(--text-color);
   font-size: 14px;
+  font-family: inherit;
+  overflow-wrap: anywhere;
   font-weight: 600;
   border-radius: calc(var(--radius-md) - 3px);
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+
+/* Длинные названия статусов остаются целыми даже на самом узком экране. */
+@media (max-width: 360px) {
+  #status-selector { flex-direction: column; }
 }
 
 .segment-btn.active {
