@@ -4,6 +4,7 @@
    ========================================================================== */
 
 :root {
+  color-scheme: light;
   /* Базовые цвета Telegram с красивыми дефолтными значениями */
   --bg-color: var(--tg-theme-bg-color, #fdf8f9);
   --secondary-bg: var(--tg-theme-secondary-bg-color, #ffffff);
@@ -47,6 +48,7 @@
 
 /* Тёмная тема: класс на <html> ставится до отрисовки (см. index.html) и при смене темы Telegram (app.js) */
 :root.dark-theme {
+  color-scheme: dark;
   --bg-color: var(--tg-theme-bg-color, #1a1618);
   --secondary-bg: var(--tg-theme-secondary-bg-color, #261f22);
   --text-color: var(--tg-theme-text-color, #f5eff1);
@@ -70,26 +72,23 @@
 
 html {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
+  overflow-x: clip;
   -webkit-text-size-adjust: 100%;
   background-color: var(--bg-color);
 }
 
 body {
   width: 100%;
-  min-height: 100%;
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--bg-color);
   color: var(--text-color);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 15px;
   line-height: 1.45;
-  overflow-x: hidden;
-  overflow-y: auto !important;
-  overscroll-behavior-y: contain !important;
-  -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-y !important;
-  padding-bottom: calc(max(var(--tg-content-safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px), 16px) + 90px);
+  /* Прокручивается документ. Фиксированная высота body обрезает отступ под меню в WebView. */
+  overscroll-behavior-y: none;
   position: relative;
 }
 
@@ -98,7 +97,10 @@ body {
   max-width: 640px;
   margin: 0 auto;
   position: relative;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Отступ принадлежит содержимому, поэтому последнюю карточку можно прокрутить выше меню. */
+  padding-bottom: calc(var(--bottom-nav-inset) + 90px);
 }
 
 /* --------------------------------------------------------------------------
@@ -606,6 +608,8 @@ body {
 }
 
 .form-group {
+  min-width: 0;
+  max-width: 100%;
   margin-bottom: 18px;
 }
 
@@ -618,15 +622,36 @@ body {
 }
 
 .form-input, .form-textarea, select.form-input {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   border: 1px solid var(--accent-pink-border);
   background: var(--secondary-bg);
   color: var(--text-color);
-  font-size: 15px;
+  font-size: 16px;
   font-family: inherit;
   transition: border-color var(--transition-fast);
+}
+
+/* Safari не должен навязывать date/time полям ширину нативного элемента управления. */
+.form-input[type="date"], .form-input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 48px;
+  text-align: center;
+}
+.form-input::-webkit-date-and-time-value { min-width: 0; text-align: center; }
+.form-input::-webkit-datetime-edit { min-width: 0; padding: 0; }
+
+.time-range-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 12px; }
+@media (min-width: 480px) {
+  .time-range-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .form-input:focus, .form-textarea:focus, select.form-input:focus {
@@ -1905,7 +1930,7 @@ body {
   --bottom-nav-height: 64px;
   --bottom-nav-inset: max(var(--tg-content-safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
 }
-body.has-bottom-nav { padding-bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 90px); }
+body.has-bottom-nav #app { padding-bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 90px); }
 .has-bottom-nav .fab-btn { bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 20px); }
 .has-bottom-nav .toast { bottom: calc(var(--bottom-nav-inset) + var(--bottom-nav-height) + 16px); }
 .bottom-nav {
