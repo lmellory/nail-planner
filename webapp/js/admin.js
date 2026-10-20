@@ -9,6 +9,7 @@ import { loadClientsDatalist, resetClientCache } from './clients.js';
 import { loadPrices } from './prices.js';
 import { loadSelectedDay, loadWeekSummary, renderAppointmentsList, renderWeekStrip } from './schedule.js';
 import { haptic } from './telegram.js';
+import { leaveDrafts } from './drafts.js';
 
 // ===== 8. АДМИН-ПАНЕЛЬ =====
 // Администратор выбирает мастера и дальше работает с обычным расписанием этого мастера: добавляет, меняет,
@@ -123,13 +124,15 @@ async function enterActAs(master) {
 
 async function exitActAs() {
   if (state.pendingWrites) return showToast('Дождитесь завершения сохранения');
-  haptic('light');
-  state.contextVersion++;
-  state.actAs = null;
-  state.actAsLabel = '';
-  setActAsUI(false);
-  goScreen('main');
-  await reloadScheduleData();
+  leaveDrafts(async () => {
+    haptic('light');
+    state.contextVersion++;
+    state.actAs = null;
+    state.actAsLabel = '';
+    setActAsUI(false);
+    goScreen('main');
+    await reloadScheduleData();
+  });
 }
 
 byId('btn-open-admin', 'button')?.addEventListener('click', () => {

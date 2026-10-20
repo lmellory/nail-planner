@@ -1,10 +1,6 @@
 /* --------------------------------------------------------------------------
    Форма записи (Экран 2)
    -------------------------------------------------------------------------- */
-.form-title-bar {
-  margin-bottom: 16px;
-}
-
 .form-group {
   min-width: 0;
   max-width: 100%;
@@ -185,6 +181,8 @@
   padding: 14px 18px;
   border-radius: var(--radius-md);
   font-size: 15px;
+  font-family: inherit;
+  min-height: 48px;
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -224,4 +222,21 @@
 .btn-danger:active {
   background: var(--danger-color);
   color: #fff;
+}
+
+button:disabled { cursor: default; opacity: 0.65; }
+button[aria-busy="true"] { cursor: progress; }
+button[hidden] { display: none; }
+button:focus-visible { outline: 2px solid var(--powder-500); outline-offset: 3px; }
+.save-error {
+  flex-basis: 100%;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }

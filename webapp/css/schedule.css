@@ -338,23 +338,28 @@
   align-items: baseline;
   justify-content: space-between;
   margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
 }
 
 .appt-card-time {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  color: var(--powder-600);
+  color: var(--powder-dark);
   letter-spacing: -0.2px;
 }
 
 .appt-card-client {
-  font-size: 17px;
+  font-size: 18px;
+  overflow-wrap: anywhere;
   font-weight: 700;
   color: var(--text-color);
   margin-bottom: 4px;
 }
 
 .appt-card-who {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   display: inline-block;
   background: var(--powder-100);
   color: var(--powder-dark);
@@ -366,15 +371,15 @@
 }
 
 .appt-card-service {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  overflow-wrap: anywhere;
   font-size: 13px;
-  color: var(--text-color);
+  color: var(--hint-color);
   margin-bottom: 4px;
 }
 
 .appt-card-comment {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
   font-size: 12px;
   color: var(--hint-color);
   background: var(--powder-50);

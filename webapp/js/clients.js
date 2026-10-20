@@ -2,6 +2,7 @@ import { isAbortError } from './requests.js';
 import { getApi } from './api-contracts.js';
 import { byId } from './dom.js';
 import { requestGate, singleAction } from './requests.js';
+import { rememberDraft, leaveDrafts, showSaveError } from './drafts.js';
 import { api } from './api.js';
 import { confirmDialog, escapeHtml, showToast } from './ui.js';
 import { haptic } from './telegram.js';
@@ -294,6 +295,7 @@ function openClientEdit(client = null) {
   }
 
   if (modal) modal.style.display = 'flex';
+  rememberDraft('modal-client-edit');
   setTimeout(() => {
     if (modal?.style.display !== 'flex' || modal.contains(document.activeElement)) return;
     nameInput?.focus();
@@ -301,8 +303,10 @@ function openClientEdit(client = null) {
 }
 
 function closeClientEdit() {
-  const modal = byId('modal-client-edit', 'div');
-  if (modal) modal.style.display = 'none';
+  leaveDrafts(() => {
+    const modal = byId('modal-client-edit', 'div');
+    if (modal) modal.style.display = 'none';
+  });
 }
 
 function saveClientModal() {
@@ -343,11 +347,13 @@ async function performSaveClientModal() {
     }
 
     haptic('success');
+    rememberDraft('modal-client-edit');
     closeClientEdit();
     await loadClients();
     await loadClientsDatalist();
   } catch (err) {
     console.error('Ошибка сохранения клиента:', err);
+    showSaveError('modal-client-edit');
   }
 }
 

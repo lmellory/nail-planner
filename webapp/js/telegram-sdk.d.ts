@@ -3,6 +3,8 @@ interface TelegramButton {
   hide(): void;
   onClick(callback: () => void): void;
   setParams(params: { text: string; color: string; text_color: string; is_visible: boolean }): void;
+  showProgress?(): void;
+  hideProgress?(): void;
 }
 interface TelegramWebApp {
   initData?: string;
@@ -12,6 +14,8 @@ interface TelegramWebApp {
   ready(): void;
   expand(): void;
   disableVerticalSwipes?(): void;
+  enableClosingConfirmation?(): void;
+  disableClosingConfirmation?(): void;
   setHeaderColor?(color: string): void;
   setBackgroundColor?(color: string): void;
   onEvent?(event: string, callback: () => void): void;

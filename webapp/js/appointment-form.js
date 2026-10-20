@@ -9,6 +9,7 @@ import { api } from './api.js';
 import { isService } from './labels.js';
 import { confirmDialog, escapeHtml, showToast } from './ui.js';
 import { loadSelectedDay, loadWeekSummary } from './schedule.js';
+import { rememberDraft, showSaveError } from './drafts.js';
 
 const conflictsRequest = requestGate();
 let conflictSequence = 0;
@@ -36,7 +37,6 @@ export function openForm(appt = null) {
   conflictsRequest();
   state.editingAppointmentId = appt && appt.id ? appt.id : null;
 
-  const formTitle = byId('form-screen-title', 'h2');
   const apptId = byId('form-appt-id', 'input');
   const dateInput = byId('form-appt-date', 'input');
   const startInput = byId('form-appt-start', 'input');
@@ -51,7 +51,6 @@ export function openForm(appt = null) {
   if (conflictAlert) conflictAlert.style.display = 'none';
 
   if (appt && appt.id) {
-    if (formTitle) formTitle.textContent = 'Редактирование записи';
     if (apptId) apptId.value = String(appt.id);
     if (dateInput) dateInput.value = String(appt.date);
     if (startInput) startInput.value = String(appt.start_time);
@@ -67,7 +66,6 @@ export function openForm(appt = null) {
     if (deleteBtn) deleteBtn.style.display = 'block';
     if (quickTomorrowBtn) quickTomorrowBtn.style.display = 'block';
   } else {
-    if (formTitle) formTitle.textContent = 'Новая запись';
     if (apptId) apptId.value = '';
     if (dateInput) dateInput.value = String(appt?.date || state.selectedDate);
 
@@ -99,6 +97,7 @@ export function openForm(appt = null) {
   updateServiceAndCoatingUI();
   updateClientMatchBadge();
   goScreen('form');
+  rememberDraft('screen-form');
   checkConflicts();
 }
 
@@ -322,6 +321,7 @@ async function performSaveAppointment() {
       showToast('Запись добавлена ✅');
     }
 
+    rememberDraft('screen-form');
     haptic('success');
     state.selectedDate = date;
     state.weekStart = fmt(mondayOf(parseDate(date)));
@@ -334,6 +334,7 @@ async function performSaveAppointment() {
     // Показываем расписание после обновления данных: следующая форма уже сможет сохраняться.
     goScreen('main');
   } catch (err) {
+    showSaveError('screen-form');
     console.error('Ошибка сохранения записи:', err);
   }
 }
@@ -348,6 +349,7 @@ async function deleteAppointment() {
       await api(`/appointments/${id}`, { method: 'DELETE' });
       haptic('success');
       showToast('Запись удалена');
+      rememberDraft('screen-form');
       goScreen('main');
       await loadWeekSummary();
       await loadSelectedDay();

@@ -8,6 +8,7 @@ import { haptic } from './telegram.js';
 import { api } from './api.js';
 import { goScreen } from './navigation.js';
 import { singleAction } from './requests.js';
+import { rememberDraft, leaveDrafts, showSaveError } from './drafts.js';
 
 import { income, incomePeriodLabel } from './finance-state.js';
 import { loadIncome } from './income.js';
@@ -32,6 +33,7 @@ function openExpenseEdit(expense = null) {
   byId('edit-expense-amount', 'input').value = String(expense ? expense.amount : '');
   byId('btn-delete-expense', 'button').style.display = expense ? 'block' : 'none';
   if (modal) modal.style.display = 'flex';
+  rememberDraft('modal-expense-edit');
   loadExpenseNames();
   setTimeout(() => {
     // Не перехватываем фокус, если мастер уже перешёл к другому полю окна.
@@ -41,8 +43,10 @@ function openExpenseEdit(expense = null) {
 }
 
 function closeExpenseEdit() {
-  const modal = byId('modal-expense-edit', 'div');
-  if (modal) modal.style.display = 'none';
+  leaveDrafts(() => {
+    const modal = byId('modal-expense-edit', 'div');
+    if (modal) modal.style.display = 'none';
+  });
 }
 
 // После изменения трат обновляем тот экран, который открыт под окном
@@ -74,10 +78,12 @@ async function performSaveExpense() {
     });
     haptic('success');
     showToast(id ? 'Трата обновлена ✅' : 'Трата добавлена ✅');
+    rememberDraft('modal-expense-edit');
     closeExpenseEdit();
     await refreshAfterExpenseChange();
   } catch (err) {
     console.error('Ошибка сохранения траты:', err);
+    showSaveError('modal-expense-edit');
   }
 }
 
@@ -90,6 +96,7 @@ function deleteExpenseModal() {
       await api(`/expenses/${id}`, { method: 'DELETE' });
       haptic('success');
       showToast('Трата удалена');
+      rememberDraft('modal-expense-edit');
       closeExpenseEdit();
       await refreshAfterExpenseChange();
     } catch (err) {

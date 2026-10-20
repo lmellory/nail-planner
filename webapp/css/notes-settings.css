@@ -26,6 +26,8 @@
   border: 1px solid var(--accent-pink-border);
 }
 
+.settings-card:first-child { margin-top: 0; }
+
 .settings-card-title {
   font-size: 16px;
   font-weight: 700;

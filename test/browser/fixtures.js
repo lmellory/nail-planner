@@ -11,7 +11,7 @@ export function appointments(count = 2) {
 
 export const test = base.extend({
   withTelegram: [true, { option: true }],
-  model: async ({ page, isMobile, withTelegram }, use) => {
+  model: [async ({ page, isMobile, withTelegram }, use) => {
     const model = {
       appointments: appointments(), writes: [], errors: [], expenses: [], clients: [],
       latency: {}, failures: {}, requests: [],
@@ -23,11 +23,15 @@ export const test = base.extend({
       if (!withTelegram) return;
       const button = { visible: false, callback: null };
       window.__telegramButton = button;
+      window.__confirmMessages = [];
+      window.__confirmAnswer = true;
       window.Telegram = { WebApp: {
         colorScheme: 'dark', themeParams: {}, ready() {}, expand() {}, disableVerticalSwipes() {}, setHeaderColor() {}, setBackgroundColor() {}, onEvent() {},
-        BackButton: { show() {}, hide() {}, onClick() {} },
+        BackButton: { show() {}, hide() {}, onClick(callback) { window.__telegramBack = callback; } },
         MainButton: { hide() { button.visible = false; }, setParams(params) { if ('is_visible' in params) button.visible = params.is_visible; }, onClick(callback) { button.callback = callback; } },
-        showConfirm(_message, callback) { callback(true); },
+        enableClosingConfirmation() { window.__closingProtection = true; },
+        disableClosingConfirmation() { window.__closingProtection = false; },
+        showConfirm(message, callback) { window.__confirmMessages.push(message); callback(window.__confirmAnswer); },
       } };
       document.addEventListener('DOMContentLoaded', () => document.documentElement.style.setProperty('--tg-content-safe-area-inset-bottom', inset + 'px'));
     }, { inset: isMobile ? 34 : 0, withTelegram });
@@ -77,6 +81,6 @@ export const test = base.extend({
     });
     await use(model);
     expect(model.errors).toEqual([]);
-  },
+  }, { auto: true }],
 });
 export { expect };

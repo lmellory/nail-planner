@@ -2,10 +2,19 @@ import { byId, all } from './dom.js';
 import { state } from './state.js';
 import { updateGreeting } from './greeting.js';
 import { tg } from './telegram.js';
+import { leaveDrafts, syncClosingProtection } from './drafts.js';
 
 // ===== Управление экранами =====
 /** @param {import('./contracts').Screen} name */
 export function goScreen(name) {
+  leaveDrafts(() => showScreen(name));
+}
+
+/** @param {import('./contracts').Screen} name */
+function showScreen(name) {
+  for (const id of ['modal-client-edit', 'modal-expense-edit', 'modal-client-view']) {
+    byId(id, 'div').style.display = 'none';
+  }
   state.currentScreen = name;
   const showTabs = ['main', 'clients', 'income', 'settings'].includes(name);
   const bottomNav = byId('bottom-nav', 'nav');
@@ -50,6 +59,7 @@ export function goScreen(name) {
       tg?.MainButton?.hide();
     } else if (name === 'note') {
       if (headerTitle) headerTitle.textContent = 'Заметка дня';
+      byId('btn-save-note', 'button').hidden = !!tg?.MainButton;
       if (tg?.MainButton) {
         tg.MainButton.setParams({
           text: 'Сохранить заметку',
@@ -78,4 +88,5 @@ export function goScreen(name) {
   window.scrollTo(0, 0);
   document.body.scrollTop = 0;
   document.documentElement.scrollTop = 0;
+  syncClosingProtection();
 }

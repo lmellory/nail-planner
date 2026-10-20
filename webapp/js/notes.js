@@ -7,6 +7,7 @@ import { api } from './api.js';
 import { haptic } from './telegram.js';
 import { confirmDialog, showToast } from './ui.js';
 import { loadSelectedDay, loadWeekSummary } from './schedule.js';
+import { rememberDraft, showSaveError } from './drafts.js';
 
 // ===== 6. ЗАМЕТКА ДНЯ =====
 
@@ -18,6 +19,7 @@ function openNote() {
   if (textarea) textarea.value = state.currentDayNote || '';
 
   goScreen('note');
+  rememberDraft('screen-note');
   setTimeout(() => textarea?.focus(), 100);
 }
 
@@ -35,6 +37,7 @@ async function performSaveDayNote() {
       body: JSON.stringify({ text }),
     });
 
+    rememberDraft('screen-note');
     haptic('success');
     showToast(text ? 'Заметка сохранена 📝' : 'Заметка удалена');
     state.currentDayNote = text;
@@ -43,6 +46,7 @@ async function performSaveDayNote() {
     await loadWeekSummary();
     await loadSelectedDay();
   } catch (err) {
+    showSaveError('screen-note');
     console.error('Ошибка сохранения заметки:', err);
   }
 }
@@ -58,6 +62,7 @@ function deleteDayNote() {
       });
       haptic('success');
       showToast('Заметка очищена');
+      rememberDraft('screen-note');
       state.currentDayNote = '';
       goScreen('main');
       await loadWeekSummary();
@@ -77,4 +82,5 @@ byId('btn-edit-note-card', 'button')?.addEventListener('click', () => {
   openNote();
 });
 byId('btn-delete-note', 'button')?.addEventListener('click', deleteDayNote);
+byId('btn-save-note', 'button')?.addEventListener('click', saveDayNote);
 byId('btn-cancel-note', 'button')?.addEventListener('click', () => goScreen('main'));

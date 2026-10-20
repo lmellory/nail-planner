@@ -7,6 +7,10 @@ test('медленное сохранение блокирует повторн�
   await page.locator('#form-appt-client').fill('Медленная сеть');
   await page.locator('#btn-submit-appt').dblclick();
   await expect(page.locator('#btn-submit-appt')).toBeDisabled();
+  await expect(page.locator('#btn-submit-appt')).toHaveText('Сохраняем…');
+  await expect(page.locator('#form-appt-client')).toBeDisabled();
+  await page.locator('#btn-back').click();
+  await expect(page.locator('#screen-form')).toHaveClass(/active/);
   await expect(page.locator('#screen-main')).toHaveClass(/active/);
   expect(model.requests.filter(request => request.path === '/api/appointments' && request.method === 'POST')).toHaveLength(1);
   expect(model.writes.filter(request => request.path === '/api/appointments')).toHaveLength(1);
@@ -20,7 +24,8 @@ test('ошибка сохранения оставляет данные в фо�
   await page.locator('#form-appt-comment').fill('Не потерять комментарий');
   model.failures['/api/appointments'] = 1;
   await page.locator('#btn-submit-appt').click();
-  await expect(page.locator('#toast')).toContainText('Тестовая ошибка');
+  await expect(page.locator('#toast')).toContainText('Сервис временно недоступен');
+  await expect(page.locator('#screen-form .save-error')).toContainText('Введённые данные остались в форме');
   await expect(page.locator('#screen-form')).toHaveClass(/active/);
   await expect(page.locator('#form-appt-client')).toHaveValue('Не потерять имя');
   await expect(page.locator('#form-appt-comment')).toHaveValue('Не потерять комментарий');

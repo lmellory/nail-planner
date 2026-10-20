@@ -94,8 +94,8 @@ body.has-bottom-nav #app { padding-bottom: calc(var(--bottom-nav-inset) + var(--
 .nav-tab.active .nav-tab-label { font-weight: 700; }
 .nav-tab:active { transform: scale(0.94); }
 .nav-tab:focus-visible, .client-records-search:focus-visible { outline: 2px solid var(--powder-500); outline-offset: -2px; }
-.clients-header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; }
-.clients-header .btn-primary-small { min-height: 38px; width: 84px; padding: 8px 14px; white-space: nowrap; }
+.clients-header { display: flex; justify-content: space-between; gap: 12px; }
+.clients-header .btn-primary-small { min-height: 40px; width: 84px; padding: 8px 14px; white-space: nowrap; }
 .clients-header #btn-back-from-clients { justify-self: start; }
 .clients-header #btn-add-client { justify-self: end; }
 .client-records-search {

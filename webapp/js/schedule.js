@@ -177,7 +177,7 @@ export async function loadSelectedDay() {
     if (state.currentDayNote.trim()) {
       if (noteCard) noteCard.style.display = 'block';
       if (noteContent) noteContent.textContent = state.currentDayNote;
-      if (btnNoteText) btnNoteText.textContent = 'Заметка 📝';
+      if (btnNoteText) btnNoteText.textContent = 'Заметка';
     } else {
       if (noteCard) noteCard.style.display = 'none';
       if (btnNoteText) btnNoteText.textContent = 'Заметка';

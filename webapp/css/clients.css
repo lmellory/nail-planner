@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+  gap: 12px;
 }
 
 .screen-sub-header h2 {
@@ -20,6 +21,9 @@
   border-radius: var(--radius-full);
   padding: 6px 14px;
   font-size: 13px;
+  font-family: inherit;
+  min-height: 40px;
+  min-width: 80px;
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -63,9 +67,12 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--text-color);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .client-card-visits {
+  flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
   background: var(--powder-100);
@@ -84,6 +91,7 @@
 }
 
 .client-card-note {
+  overflow-wrap: anywhere;
   font-size: 12px;
   color: var(--powder-600);
   background: var(--powder-50);
@@ -118,7 +126,7 @@
   max-width: 520px;
   max-height: 85vh;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  padding: 20px 18px env(safe-area-inset-bottom, 20px);
+  padding: 20px 18px max(env(safe-area-inset-bottom, 0px), 20px);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -138,6 +146,8 @@
 }
 
 .modal-close-btn {
+  min-width: 40px;
+  min-height: 40px;
   background: none;
   border: none;
   font-size: 26px;
@@ -222,6 +232,7 @@
 
 .modal-footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 16px;
 }

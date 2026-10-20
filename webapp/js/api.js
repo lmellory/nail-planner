@@ -37,7 +37,7 @@ async function request(path, options) {
   } catch (err) {
     if (context !== state.contextVersion) throw new DOMException('Контекст изменился', 'AbortError');
     if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') throw err;
-    showToast('Ошибка сети');
+    showToast('Нет связи с сервером. Проверьте интернет и попробуйте ещё раз');
     throw err;
   }
   if (context !== state.contextVersion) throw new DOMException('Контекст изменился', 'AbortError');
@@ -49,7 +49,7 @@ async function request(path, options) {
   }
   if (!res.ok) {
     const err = /** @type {unknown} */ (await res.json().catch(() => null));
-    const msg = err && typeof err === 'object' && 'error' in err && typeof err.error === 'string'
+    const msg = res.status >= 500 ? 'Сервис временно недоступен. Попробуйте ещё раз чуть позже' : err && typeof err === 'object' && 'error' in err && typeof err.error === 'string'
       ? err.error : 'Ошибка ' + res.status;
     showToast(msg);
     throw new Error(msg);

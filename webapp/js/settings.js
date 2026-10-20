@@ -6,6 +6,7 @@ import { formInput, formSelect } from './dom.js';
 import { haptic } from './telegram.js';
 import { showToast } from './ui.js';
 import { loadPrices } from './prices.js';
+import { rememberDraft, showSaveError } from './drafts.js';
 
 // ===== 7. НАСТРОЙКИ И ЭКСПОРТ =====
 
@@ -38,9 +39,9 @@ workDayButtons.forEach((btn) => {
 });
 
 export async function openSettings() {
-  loadPrices().catch(() => {});
+  if (state.currentScreen === 'settings') return;
   try {
-    const s = await getApi('/settings');
+    const [s] = await Promise.all([getApi('/settings'), loadPrices()]);
     const enabledCheck = formInput('setting-notify-enabled');
     const newApptCheck = formInput('setting-notify-new-appt');
     const timeInput = formInput('setting-notify-time');
@@ -74,8 +75,10 @@ export async function openSettings() {
     }
   } catch (err) {
     console.error('Ошибка загрузки настроек:', err);
+    return;
   }
   goScreen('settings');
+  rememberDraft('settings-preferences');
 }
 
 function saveSettings() {
@@ -103,10 +106,12 @@ async function performSaveSettings() {
       work_days,
       backup_enabled,
     });
+    rememberDraft('settings-preferences');
     haptic('success');
     showToast('Настройки сохранены ✅');
   } catch (err) {
     console.error('Ошибка сохранения настроек:', err);
+    showSaveError('settings-preferences');
   }
 }
 

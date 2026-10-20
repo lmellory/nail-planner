@@ -4,6 +4,7 @@ import { getApi, putApi } from './api-contracts.js';
 import { formInput } from './dom.js';
 import { haptic } from './telegram.js';
 import { showToast } from './ui.js';
+import { rememberDraft, showSaveError } from './drafts.js';
 
 // ===== ПРАЙС УСЛУГ =====
 /** @type {Array<import('../../src/types').Service>} */
@@ -19,6 +20,7 @@ function applyPricesToInputs() {
 export async function loadPrices() {
   state.prices = await getApi('/prices');
   applyPricesToInputs();
+  rememberDraft('settings-prices');
 }
 
 function savePrices() {
@@ -40,10 +42,12 @@ async function performSavePrices() {
   try {
     state.prices = await putApi('/prices', body);
     applyPricesToInputs();
+    rememberDraft('settings-prices');
     haptic('success');
     showToast('Прайс сохранён ✅');
   } catch (err) {
     console.error('Ошибка сохранения прайса:', err);
+    showSaveError('settings-prices');
   }
 }
 

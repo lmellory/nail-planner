@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { tg } from './telegram.js';
 
 /** Последний запрос побеждает; смена мастера делает прежний ответ неактуальным. */
 export function requestGate() {
@@ -22,12 +23,29 @@ export function singleAction(key, buttonIds, action) {
   if (actions.has(key)) return /** @type {Promise<T>} */ (actions.get(key));
   const buttons = buttonIds.map(id => document.getElementById(id)).filter(button => button instanceof HTMLButtonElement);
   const disabled = buttons.map(button => button.disabled);
-  buttons.forEach(button => { button.disabled = true; });
+  const labels = buttons.map(button => button.innerHTML);
+  const controls = [...new Set(buttons.flatMap(button => [...(button.closest('[data-draft]')?.querySelectorAll('input, textarea, select, button') || [])]))]
+    .filter(el => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || el instanceof HTMLButtonElement);
+  const controlStates = controls.map(el => el.disabled);
+  buttons.forEach(button => {
+    button.closest('[data-draft]')?.querySelector('.save-error')?.remove();
+    button.disabled = true;
+    button.textContent = 'Сохраняем…';
+    button.setAttribute('aria-busy', 'true');
+  });
+  controls.forEach(el => { el.disabled = true; });
+  if (key === 'saveDayNote') tg?.MainButton?.showProgress?.();
   state.pendingWrites++;
   const task = Promise.resolve().then(action).finally(() => {
     actions.delete(key);
     state.pendingWrites--;
-    buttons.forEach((button, index) => { button.disabled = disabled[index]; });
+    if (key === 'saveDayNote') tg?.MainButton?.hideProgress?.();
+    controls.forEach((el, index) => { el.disabled = controlStates[index]; });
+    buttons.forEach((button, index) => {
+      button.disabled = disabled[index];
+      button.innerHTML = labels[index];
+      button.removeAttribute('aria-busy');
+    });
   });
   actions.set(key, task);
   return task;
